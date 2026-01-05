@@ -18,7 +18,10 @@ const getSettings = () => {
 const getUsers = () => {
     try {
         if (!fs.existsSync(usersFile)) return [];
-        return JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
+        const content = fs.readFileSync(usersFile, 'utf-8');
+        // Handle empty file case
+        if (!content || content.trim() === "") return [];
+        return JSON.parse(content);
     } catch (e) {
         return [];
     }
@@ -43,11 +46,7 @@ router.post('/send-otp', async (req, res) => {
         return res.json({ status: false, message: "Missing fields" });
     }
 
-    if (!email.endsWith('@gmail.com')) {
-        return res.json({ status: false, message: "Only @gmail.com addresses are allowed." });
-    }
-
-    if (!email.endsWith('@gmail.com')) {
+    if (!email.toLowerCase().endsWith('@gmail.com')) {
         return res.json({ status: false, message: "Only @gmail.com addresses are allowed." });
     }
 
@@ -69,16 +68,20 @@ router.post('/send-otp', async (req, res) => {
     });
 
     const users = getUsers();
-    if (users.find(u => u.username === username)) {
+    if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
         return res.json({ status: false, message: "Username already taken." });
     }
-    if (users.find(u => u.email === email)) {
+
+    // Normalize email for check
+    const normalizedEmail = email.toLowerCase();
+
+    if (users.find(u => u.email.toLowerCase() === normalizedEmail)) {
         return res.json({ status: false, message: "Email already registered." });
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-    otpStore.set(email, {
+    otpStore.set(normalizedEmail, {
         code,
         username,
         password,
@@ -89,7 +92,7 @@ router.post('/send-otp', async (req, res) => {
     try {
         await transporter.sendMail({
             from: "Easir API <noreply@easiriqbal.com>",
-            to: email,
+            to: normalizedEmail,
             subject: "Your Verification Code - Easir API",
             html: `
                 <div style="font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; border-radius: 10px;">
@@ -101,7 +104,7 @@ router.post('/send-otp', async (req, res) => {
             `
         });
 
-        res.json({ status: true, message: "Verification code sent to " + email });
+        res.json({ status: true, message: "Verification code sent to " + normalizedEmail });
 
     } catch (error) {
         console.error("Email Error:", error);
@@ -116,14 +119,15 @@ router.post('/register', (req, res) => {
         return res.status(400).json({ status: false, message: "Email and Code required" });
     }
 
-    const pending = otpStore.get(email);
+    const normalizedEmail = email.toLowerCase();
+    const pending = otpStore.get(normalizedEmail);
 
     if (!pending) {
         return res.json({ status: false, message: "Registration session expired or invalid." });
     }
 
     if (Date.now() > pending.expires) {
-        otpStore.delete(email);
+        otpStore.delete(normalizedEmail);
         return res.json({ status: false, message: "Code expired. Please try again." });
     }
 
@@ -133,27 +137,31 @@ router.post('/register', (req, res) => {
 
     const users = getUsers();
 
-    if (users.find(u => u.username === pending.username)) {
+    // Double check just in case
+    if (users.find(u => u.username.toLowerCase() === pending.username.toLowerCase())) {
         return res.json({ status: false, message: "Username already taken." });
     }
+
+    // Admin Check
+    const isAdmin = normalizedEmail === 'easiriqbalmahi@gmail.com';
 
     const newUser = {
         username: pending.username,
         password: pending.password,
         name: pending.name,
-        email: email,
-        role: "user",
+        email: normalizedEmail,
+        role: isAdmin ? "admin" : "user", // Auto-grant admin
         apikey: generateApiKey()
     };
 
     users.push(newUser);
     saveUsers(users);
 
-    otpStore.delete(email);
+    otpStore.delete(normalizedEmail);
 
     res.json({
         status: true,
-        message: "Registration Successful",
+        message: isAdmin ? "Registration Successful (Admin Access Granted)" : "Registration Successful",
         apikey: newUser.apikey
     });
 });
@@ -161,8 +169,14 @@ router.post('/register', (req, res) => {
 router.post('/login', (req, res) => {
     const { username, password } = req.body;
 
+    // Case insensitive matching
+    const normalizedInput = username.toLowerCase();
+
     const users = getUsers();
-    const user = users.find(u => (u.username === username || u.email === username) && u.password === password);
+    const user = users.find(u =>
+        (u.username.toLowerCase() === normalizedInput || u.email.toLowerCase() === normalizedInput) &&
+        u.password === password
+    );
 
     if (user) {
         return res.json({
