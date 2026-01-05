@@ -5,7 +5,9 @@
   "main": "app.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node --no-deprecation app.js"
+    "start": "node --no-deprecation app.js",
+    "build": "cd web && npm install && npm run build",
+    "postinstall": "npm run build"
   },
   "author": "Easir Iqbal Mahi",
   "license": "ISC",
