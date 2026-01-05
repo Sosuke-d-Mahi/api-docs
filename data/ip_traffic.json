@@ -1,0 +1,28 @@
+{
+  "::1": {
+    "ip": "::1",
+    "count": 55,
+    "firstSeen": 1767550252237,
+    "lastSeen": 1767613260567,
+    "paths": [
+      "GET /admin/traffic",
+      "GET /admin/traffic",
+      "GET /admin/traffic",
+      "GET /admin/dashboard",
+      "GET /admin/dashboard"
+    ]
+  },
+  "192.168.1.107": {
+    "ip": "192.168.1.107",
+    "count": 13,
+    "firstSeen": 1767613318695,
+    "lastSeen": 1767623167693,
+    "paths": [
+      "GET /api/docs",
+      "GET /login",
+      "GET /login",
+      "GET /login",
+      "GET /login"
+    ]
+  }
+}

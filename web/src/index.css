@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-dark: #030014;
+  --bg-card: rgba(15, 23, 42, 0.6);
+  --bg-card-hover: rgba(30, 41, 59, 0.8);
+  --primary: #8b5cf6;
+  --primary-glow: rgba(139, 92, 246, 0.5);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border: rgba(148, 163, 184, 0.1);
+  --glass: blur(16px);
+  --text-stroke-color: rgba(255, 255, 255, 0.95);
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--bg-dark);
+  overflow-x: hidden;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  /* Subtle shadow for readability */
+}
+
+/* Reverted aggressive transparent text rules */
+
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-card-hover);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Component Styles */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.btn-primary {
+  background-image: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
+  color: transparent !important;
+  /* Even buttons get the outline treatment as requested */
+  -webkit-text-stroke: 1px white !important;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px var(--primary-glow);
+}
+
+.gradient-text {
+  /* Gradient text usually needs background-clip. 
+     If user wants TRANSPARENT text, we favor that. 
+     But if we want 'gradient outline', that's harder.
+     For now, we enforce the transparency rule globally as requested. */
+  background: none;
+  -webkit-text-fill-color: transparent;
+}

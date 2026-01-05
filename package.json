@@ -1,0 +1,29 @@
+{
+  "name": "easir-api-v2",
+  "version": "2.0.0",
+  "description": "Premium High-Performance API Service engineered by Easir Iqbal Mahi.",
+  "main": "app.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node --no-deprecation app.js"
+  },
+  "author": "Easir Iqbal Mahi",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.8",
+    "body-parser": "^1.20.3",
+    "chalk": "^4.1.2",
+    "cheerio": "^1.0.0",
+    "concurrently": "^9.2.1",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "fs": "^0.0.1-security",
+    "https": "^1.0.0",
+    "node-fetch": "^2.6.1",
+    "nodemailer": "^7.0.12",
+    "socket.io": "^4.8.3",
+    "spotidownloader": "^1.0.0",
+    "systeminformation": "^5.28.10",
+    "yt-search": "^2.12.1"
+  }
+}

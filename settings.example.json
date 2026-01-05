@@ -1,0 +1,48 @@
+{
+    "name": "Easir API",
+    "version": "v2.0.0",
+    "description": "Premium High-Performance API Service",
+    "header": {
+        "status": "Operational",
+        "imageSrc": [
+            "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=2670&auto=format&fit=crop"
+        ],
+        "imageSize": {
+            "mobile": "100%",
+            "tablet": "100%",
+            "desktop": "100%"
+        }
+    },
+    "apiSettings": {
+        "operator": "Your Name Here"
+    },
+    "links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/yourusername"
+        },
+        {
+            "name": "Contact",
+            "url": "contact@example.com"
+        }
+    ],
+    "notifications": [
+        {
+            "title": "Welcome to Easir API v2",
+            "message": "Experience the next generation of API services."
+        }
+    ],
+    "credentials": {
+        "gmailAccount": {
+            "email": "your-email@gmail.com",
+            "clientId": "YOUR_GOOGLE_CLIENT_ID",
+            "clientSecret": "YOUR_GOOGLE_CLIENT_SECRET",
+            "refreshToken": "YOUR_GOOGLE_REFRESH_TOKEN",
+            "apiKey": "YOUR_API_KEY_OPTIONAL"
+        },
+        "gRecaptcha": {
+            "siteKey": "YOUR_RECAPTCHA_SITE_KEY",
+            "secretKey": "YOUR_RECAPTCHA_SECRET_KEY"
+        }
+    }
+}
