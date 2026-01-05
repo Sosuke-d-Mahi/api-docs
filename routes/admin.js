@@ -7,7 +7,7 @@ const adminAuth = require('../middleware/adminAuth');
 const logger = require('../utils/logger');
 const { getTraffic } = require('../middleware/trafficLogger');
 
-const settingsPath = path.join(__dirname, '../settings.json');
+const settingsManager = require('../utils/settingsManager');
 const bannedPath = path.join(__dirname, '../data/banned_ips.json');
 
 router.get('/stats', adminAuth, async (req, res) => {
@@ -38,17 +38,17 @@ router.get('/stats', adminAuth, async (req, res) => {
 
 router.get('/settings', adminAuth, (req, res) => {
     try {
-        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+        const settings = settingsManager.get();
         res.json({ status: true, data: settings });
     } catch (e) {
         res.status(500).json({ status: false, error: "Failed to read settings" });
     }
 });
 
-router.post('/settings', adminAuth, (req, res) => {
+router.post('/settings', adminAuth, async (req, res) => {
     try {
         const newSettings = req.body;
-        fs.writeFileSync(settingsPath, JSON.stringify(newSettings, null, 2));
+        await settingsManager.update(newSettings);
         res.json({ status: true, message: "Settings updated successfully" });
     } catch (e) {
         res.status(500).json({ status: false, error: "Failed to save settings" });

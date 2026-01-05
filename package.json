@@ -21,6 +21,7 @@
     "express": "^4.19.2",
     "fs": "^0.0.1-security",
     "https": "^1.0.0",
+    "mongoose": "^9.1.2",
     "node-fetch": "^2.6.1",
     "nodemailer": "^7.0.12",
     "socket.io": "^4.8.3",

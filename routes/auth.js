@@ -5,16 +5,12 @@ const path = require('path');
 const nodemailer = require('nodemailer');
 
 const usersFile = path.join(__dirname, '../data/users.json');
-const settingsFile = path.join(__dirname, '../settings.json');
+const settingsManager = require('../utils/settingsManager');
 
 const otpStore = new Map();
 
 const getSettings = () => {
-    try {
-        return JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
-    } catch (e) {
-        return {};
-    }
+    return settingsManager.get();
 };
 
 let transporter = null;

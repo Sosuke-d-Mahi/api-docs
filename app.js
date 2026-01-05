@@ -10,14 +10,14 @@ const apiKeyAuth = require('./middleware/apiKeyAuth');
 const ipGuard = require('./middleware/ipGuard');
 const { trafficLogger } = require('./middleware/trafficLogger');
 
-const settingsPath = path.join(__dirname, 'settings.json');
-let settings = {};
-try {
-    settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-} catch (e) {
-    logger.error('Failed to load settings.json: ' + e.message);
-    process.exit(1);
-}
+const connectDB = require('./utils/db');
+const settingsManager = require('./utils/settingsManager');
+
+// MongoDB Connection
+const MONGO_URI = "mongodb+srv://Easirmahi:01200120mahi@anchestor.wmvrhcb.mongodb.net/easir-apis?retryWrites=true&w=majority&appName=Anchestor";
+connectDB(MONGO_URI).then(() => {
+    settingsManager.init();
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -33,9 +33,10 @@ app.use((req, res, next) => {
     const originalJson = res.json;
     res.json = function (data) {
         if (data && typeof data === 'object') {
+            const currentSettings = settingsManager.get();
             const responseData = {
                 status: data.status !== undefined ? data.status : true,
-                creator: settings.apiSettings.operator || "Easir Iqbal Mahi",
+                creator: (currentSettings.apiSettings && currentSettings.apiSettings.operator) ? currentSettings.apiSettings.operator : "Easir Iqbal Mahi",
                 ...data
             };
             return originalJson.call(this, responseData);
@@ -103,7 +104,7 @@ io.on('connection', (socket) => {
         logger.info(`Socket ${socket.id} joined room ${room}`);
     });
 
-    socket.emit('config', settings);
+    socket.emit('config', settingsManager.get());
 });
 
 setInterval(async () => {
