@@ -13,26 +13,7 @@ const getSettings = () => {
     return settingsManager.get();
 };
 
-let transporter = null;
 
-const initTransporter = () => {
-    const settings = getSettings();
-    if (settings.credentials && settings.credentials.gmailAccount) {
-        const creds = settings.credentials.gmailAccount;
-        transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                type: 'OAuth2',
-                user: creds.email,
-                clientId: creds.clientId,
-                clientSecret: creds.clientSecret,
-                refreshToken: creds.refreshToken
-            }
-        });
-    }
-};
-
-initTransporter();
 
 const getUsers = () => {
     try {
@@ -66,10 +47,26 @@ router.post('/send-otp', async (req, res) => {
         return res.json({ status: false, message: "Only @gmail.com addresses are allowed." });
     }
 
-    if (!transporter) initTransporter();
-    if (!transporter) {
+    if (!email.endsWith('@gmail.com')) {
+        return res.json({ status: false, message: "Only @gmail.com addresses are allowed." });
+    }
+
+    const settings = getSettings();
+    if (!settings.credentials || !settings.credentials.gmailAccount) {
         return res.status(500).json({ status: false, message: "Server Email Config Missing" });
     }
+
+    const creds = settings.credentials.gmailAccount;
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            type: 'OAuth2',
+            user: creds.email,
+            clientId: creds.clientId,
+            clientSecret: creds.clientSecret,
+            refreshToken: creds.refreshToken
+        }
+    });
 
     const users = getUsers();
     if (users.find(u => u.username === username)) {
