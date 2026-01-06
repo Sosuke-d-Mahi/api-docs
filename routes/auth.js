@@ -62,15 +62,24 @@ router.post('/send-otp', async (req, res) => {
 
         let transporter;
         try {
+            // Using explicit settings to avoid timeouts on Render
             transporter = nodemailer.createTransport({
-                service: 'gmail',
+                host: 'smtp.gmail.com',
+                port: 587,
+                secure: false, // use STARTTLS
+                requireTLS: true,
                 auth: {
                     type: 'OAuth2',
                     user: creds.email,
                     clientId: creds.clientId,
                     clientSecret: creds.clientSecret,
                     refreshToken: creds.refreshToken
-                }
+                },
+                tls: {
+                    rejectUnauthorized: false // Helps with some self-signed cert issues if they arise, though Gmail is usually fine.
+                },
+                logger: true,
+                debug: true
             });
         } catch (err) {
             console.error("Transporter Creation Error:", err);
