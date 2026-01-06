@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node --no-deprecation app.js",
-    "build": "export NODE_OPTIONS=--max-old-space-size=460 && cd web && npm install && npm run build && echo 'BUILD COMPLETE. LISTING DIST:' && ls -R ../dist"
+    "build": "cd web && npm install && npm run build && echo 'BUILD COMPLETE. LISTING DIST:' && ls -R ../dist",
+    "postinstall": "npm run build"
   },
   "author": "Easir Iqbal Mahi",
   "license": "ISC",
