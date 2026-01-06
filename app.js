@@ -49,7 +49,31 @@ app.use((req, res, next) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
 
-app.use('/', express.static(path.join(__dirname, 'web/dist'), {
+// DEBUGGING LOGS
+const webDistPath = path.join(__dirname, 'web/dist');
+logger.info('Checking Frontend Path: ' + webDistPath);
+
+if (fs.existsSync(webDistPath)) {
+    logger.info('Frontend directory exists at: ' + webDistPath);
+    try {
+        const files = fs.readdirSync(webDistPath);
+        logger.info('Frontend files: ' + files.join(', '));
+    } catch (e) {
+        logger.error('Error listing frontend files: ' + e.message);
+    }
+} else {
+    logger.error('Frontend directory NOT found at: ' + webDistPath);
+    // List parent to see what IS there
+    const webPath = path.join(__dirname, 'web');
+    if (fs.existsSync(webPath)) {
+        logger.info('Web directory exists. Contents: ' + fs.readdirSync(webPath).join(', '));
+    } else {
+        logger.error('Web directory NOT found at: ' + webPath);
+        logger.info('Root contents: ' + fs.readdirSync(__dirname).join(', '));
+    }
+}
+
+app.use('/', express.static(webDistPath, {
     setHeaders: (res, path) => {
         if (path.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
