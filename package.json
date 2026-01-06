@@ -5,9 +5,8 @@
   "main": "app.js",
   "type": "commonjs",
   "scripts": {
-    "start": "cd web && npm install && npm run build && cd .. && node --no-deprecation app.js",
-    "build": "cd web && npm install && npm run build",
-    "postinstall": "npm run build"
+    "start": "node --no-deprecation app.js",
+    "build": "export NODE_OPTIONS=--max-old-space-size=460 && cd web && npm install && npm run build"
   },
   "author": "Easir Iqbal Mahi",
   "license": "ISC",
