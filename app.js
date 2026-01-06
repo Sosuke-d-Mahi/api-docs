@@ -50,7 +50,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
 
 // DEBUGGING LOGS
-const webDistPath = path.join(__dirname, 'web/dist');
+const webDistPath = path.join(__dirname, 'dist');
 logger.info('Checking Frontend Path: ' + webDistPath);
 
 if (fs.existsSync(webDistPath)) {
@@ -103,7 +103,7 @@ app.use((req, res) => {
         return res.status(404).json({ status: false, message: "Endpoint Not Found" });
     }
 
-    const indexPath = path.join(__dirname, 'web/dist/index.html');
+    const indexPath = path.join(__dirname, 'dist/index.html');
     if (fs.existsSync(indexPath)) {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');

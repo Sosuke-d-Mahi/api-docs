@@ -1,15 +1,15 @@
 {
   "::1": {
     "ip": "::1",
-    "count": 55,
+    "count": 59,
     "firstSeen": 1767550252237,
-    "lastSeen": 1767613260567,
+    "lastSeen": 1767708400624,
     "paths": [
-      "GET /admin/traffic",
-      "GET /admin/traffic",
-      "GET /admin/traffic",
-      "GET /admin/dashboard",
-      "GET /admin/dashboard"
+      "GET /favicon.ico",
+      "GET /",
+      "GET /favicon.ico",
+      "GET /",
+      "GET /admin/traffic"
     ]
   },
   "192.168.1.107": {
