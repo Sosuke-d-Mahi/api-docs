@@ -2,24 +2,32 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Shield, RefreshCw, AlertTriangle, Eye, Clock, Hash } from 'lucide-react';
 import io from 'socket.io-client';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Traffic() {
+    const { user } = useAuth();
     const [traffic, setTraffic] = useState({});
     const [loading, setLoading] = useState(true);
     const [banning, setBanning] = useState(null);
 
     const fetchTraffic = () => {
-        const key = localStorage.getItem("adminKey") || "easir-secret-key-123";
-        axios.get('/api/admin/traffic', { headers: { 'x-admin-key': key } })
+        if (!user || !user.apikey) return;
+
+        axios.get('/api/admin/traffic', {
+            headers: { 'Authorization': user.apikey }
+        })
             .then(res => {
                 setTraffic(res.data.data);
                 setLoading(false);
             })
-            .catch(console.error);
+            .catch(err => {
+                console.error(err);
+                setLoading(false);
+            });
     };
 
     useEffect(() => {
-        fetchTraffic();
+        if (user) fetchTraffic();
 
         const socket = io();
 
@@ -31,14 +39,16 @@ export default function Traffic() {
         });
 
         return () => socket.disconnect();
-    }, []);
+    }, [user]);
 
     const handleBan = async (ip) => {
         if (!confirm(`Are you sure you want to ban ${ip}?`)) return;
         setBanning(ip);
-        const key = localStorage.getItem("adminKey") || "easir-secret-key-123";
+
         try {
-            await axios.post('/api/admin/ban-ip', { ip }, { headers: { 'x-admin-key': key } });
+            await axios.post('/api/admin/ban-ip', { ip }, {
+                headers: { 'Authorization': user.apikey }
+            });
         } catch (e) {
             alert('Failed to ban IP');
         } finally {
