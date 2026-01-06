@@ -22,7 +22,7 @@ export default defineConfig({
         secure: false,
       }
     }
-  }
+  },
   build: {
     sourcemap: false,
     chunkSizeWarningLimit: 1600,
