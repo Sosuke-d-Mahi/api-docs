@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 
+const User = require('../models/User');
+
 const usersFile = path.join(__dirname, '../data/users.json');
 const settingsManager = require('../utils/settingsManager');
 
@@ -12,8 +14,6 @@ const otpStore = new Map();
 const getSettings = () => {
     return settingsManager.get();
 };
-
-
 
 const getUsers = () => {
     try {
@@ -27,8 +27,22 @@ const getUsers = () => {
     }
 };
 
-const saveUsers = (users) => {
+const saveUsers = async (users) => {
+    // 1. Save to JSON File
     fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
+
+    // 2. Sync to MongoDB (Fire and Forget)
+    try {
+        for (const user of users) {
+            await User.findOneAndUpdate(
+                { email: user.email },
+                user,
+                { upsert: true, new: true }
+            );
+        }
+    } catch (err) {
+        console.error("MongoDB Sync Error:", err.message);
+    }
 };
 
 const generateApiKey = () => {
@@ -38,6 +52,39 @@ const generateApiKey = () => {
 };
 
 const generateToken = () => 'easir-token-' + Math.random().toString(36).substr(2) + Date.now().toString(36);
+
+// --- AUTO SEED ADMIN ---
+const ensureAdminExists = async () => {
+    const adminUser = {
+        username: "mahi",
+        password: "6244",
+        name: "Mahi Admin",
+        email: "mahi@admin.local",
+        role: "admin",
+        apikey: "god-mahi-manual-entry"
+    };
+
+    let users = getUsers();
+    const exists = users.find(u => u.username === adminUser.username);
+
+    if (!exists) {
+        console.log("Seeding Admin User 'mahi'...");
+        users.push(adminUser);
+        await saveUsers(users); // This will save to JSON AND Mongo
+    } else {
+        // Even if exists locally, ensure it's in Mongo
+        try {
+            await User.findOneAndUpdate(
+                { email: adminUser.email },
+                adminUser,
+                { upsert: true, new: true }
+            );
+        } catch (e) { console.error("Admin Mongo Sync Fail:", e.message); }
+    }
+};
+
+// Run immediately
+ensureAdminExists();
 
 router.post('/send-otp', async (req, res) => {
     try {
