@@ -40,56 +40,65 @@ const generateApiKey = () => {
 const generateToken = () => 'easir-token-' + Math.random().toString(36).substr(2) + Date.now().toString(36);
 
 router.post('/send-otp', async (req, res) => {
-    const { username, email, name, password } = req.body;
-
-    if (!username || !email || !password) {
-        return res.json({ status: false, message: "Missing fields" });
-    }
-
-    if (!email.toLowerCase().endsWith('@gmail.com')) {
-        return res.json({ status: false, message: "Only @gmail.com addresses are allowed." });
-    }
-
-    const settings = getSettings();
-    if (!settings.credentials || !settings.credentials.gmailAccount) {
-        return res.status(500).json({ status: false, message: "Server Email Config Missing" });
-    }
-
-    const creds = settings.credentials.gmailAccount;
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            type: 'OAuth2',
-            user: creds.email,
-            clientId: creds.clientId,
-            clientSecret: creds.clientSecret,
-            refreshToken: creds.refreshToken
-        }
-    });
-
-    const users = getUsers();
-    if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
-        return res.json({ status: false, message: "Username already taken." });
-    }
-
-    // Normalize email for check
-    const normalizedEmail = email.toLowerCase();
-
-    if (users.find(u => u.email.toLowerCase() === normalizedEmail)) {
-        return res.json({ status: false, message: "Email already registered." });
-    }
-
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    otpStore.set(normalizedEmail, {
-        code,
-        username,
-        password,
-        name: name || username,
-        expires: Date.now() + 5 * 60 * 1000
-    });
-
     try {
+        const { username, email, name, password } = req.body;
+
+        if (!username || !email || !password) {
+            return res.json({ status: false, message: "Missing fields" });
+        }
+
+        if (!email.toLowerCase().endsWith('@gmail.com')) {
+            return res.json({ status: false, message: "Only @gmail.com addresses are allowed." });
+        }
+
+        const settings = getSettings();
+        // Safe check for settings existence
+        if (!settings || !settings.credentials || !settings.credentials.gmailAccount) {
+            console.error("Critical: Email settings missing.");
+            return res.status(500).json({ status: false, message: "Server Email Config Missing" });
+        }
+
+        const creds = settings.credentials.gmailAccount;
+
+        let transporter;
+        try {
+            transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    type: 'OAuth2',
+                    user: creds.email,
+                    clientId: creds.clientId,
+                    clientSecret: creds.clientSecret,
+                    refreshToken: creds.refreshToken
+                }
+            });
+        } catch (err) {
+            console.error("Transporter Creation Error:", err);
+            return res.status(500).json({ status: false, message: "Email Service Unavailable" });
+        }
+
+        const users = getUsers();
+        if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
+            return res.json({ status: false, message: "Username already taken." });
+        }
+
+        // Normalize email for check
+        const normalizedEmail = email.toLowerCase();
+
+        if (users.find(u => u.email.toLowerCase() === normalizedEmail)) {
+            return res.json({ status: false, message: "Email already registered." });
+        }
+
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+        otpStore.set(normalizedEmail, {
+            code,
+            username,
+            password,
+            name: name || username,
+            expires: Date.now() + 5 * 60 * 1000
+        });
+
         await transporter.sendMail({
             from: "Easir API <noreply@easiriqbal.com>",
             to: normalizedEmail,
@@ -107,8 +116,8 @@ router.post('/send-otp', async (req, res) => {
         res.json({ status: true, message: "Verification code sent to " + normalizedEmail });
 
     } catch (error) {
-        console.error("Email Error:", error);
-        res.json({ status: false, message: "Failed to send email: " + error.message });
+        console.error("Deep Logic Error in /send-otp:", error);
+        res.status(500).json({ status: false, message: "Internal Server Error: " + error.message });
     }
 });
 

@@ -157,4 +157,12 @@ server.listen(PORT, () => {
     logger.system(`Server running on port ${PORT}`);
 });
 
+// Global Error Handler to prevent 520 Crashes
+app.use((err, req, res, next) => {
+    logger.error("Unhandled Server Error: " + err.message);
+    if (!res.headersSent) {
+        res.status(500).json({ status: false, message: "Internal Server Error" });
+    }
+});
+
 module.exports = app;

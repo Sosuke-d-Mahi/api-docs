@@ -5,7 +5,7 @@
   "main": "app.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node --no-deprecation app.js",
+    "start": "node --max-old-space-size=460 --no-deprecation app.js",
     "build": "cd web && npm install && npm run build && echo 'BUILD COMPLETE. LISTING DIST:' && ls -R ../dist",
     "postinstall": "npm run build"
   },
