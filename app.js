@@ -169,7 +169,7 @@ setInterval(async () => {
     }
 }, 1000);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 6969;
 server.listen(PORT, () => {
     logger.system(`Server running on port ${PORT}`);
 });
