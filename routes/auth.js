@@ -107,6 +107,18 @@ router.post('/send-otp', async (req, res) => {
 
         const creds = settings.credentials.gmailAccount;
 
+        // Debug Log for Missing Creds
+        const missingKeys = [];
+        if (!creds.email) missingKeys.push("email");
+        if (!creds.clientId) missingKeys.push("clientId");
+        if (!creds.clientSecret) missingKeys.push("clientSecret");
+        if (!creds.refreshToken) missingKeys.push("refreshToken");
+
+        if (missingKeys.length > 0) {
+            console.error("CRITICAL: Missing Email Credentials: " + missingKeys.join(", "));
+            return res.status(500).json({ status: false, message: "Server Email Config Incomplete: " + missingKeys.join(", ") });
+        }
+
         let transporter;
         try {
             // Using explicit settings to avoid timeouts on Render
@@ -126,7 +138,9 @@ router.post('/send-otp', async (req, res) => {
                     rejectUnauthorized: false // Helps with some self-signed cert issues if they arise, though Gmail is usually fine.
                 },
                 logger: true,
-                debug: true
+                debug: true,
+                connectionTimeout: 10000, // 10s connection timeout
+                socketTimeout: 10000      // 10s socket timeout
             });
         } catch (err) {
             console.error("Transporter Creation Error:", err);
@@ -155,7 +169,10 @@ router.post('/send-otp', async (req, res) => {
             expires: Date.now() + 5 * 60 * 1000
         });
 
-        await transporter.sendMail({
+        console.log(`[Auth] User ${username} requested OTP for ${normalizedEmail}. Code generated. Sending email...`);
+
+        // Send Email with Timeout Protection
+        const mailOptions = {
             from: "Easir API <noreply@easiriqbal.com>",
             to: normalizedEmail,
             subject: "Your Verification Code - Easir API",
@@ -167,7 +184,14 @@ router.post('/send-otp', async (req, res) => {
                     <p style="color: #666; font-size: 12px; margin-top: 20px;">This code expires in 5 minutes.</p>
                 </div>
             `
-        });
+        };
+
+        const sendMailPromise = transporter.sendMail(mailOptions);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Email Send Timeout (15s)")), 15000));
+
+        await Promise.race([sendMailPromise, timeoutPromise]);
+
+        console.log(`[Auth] Email sent successfully to ${normalizedEmail}`);
 
         res.json({ status: true, message: "Verification code sent to " + normalizedEmail });
 

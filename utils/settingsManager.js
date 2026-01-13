@@ -46,6 +46,19 @@ class SettingsManager {
             logger.error('Failed to sync settings with MongoDB: ' + e.message);
             // Fallback to file-only mode
         }
+
+        // --- ENV VAR OVERRIDE (For Render/Production) ---
+        if (process.env.GMAIL_EMAIL && process.env.GMAIL_CLIENT_ID) {
+            if (!this.cache.credentials) this.cache.credentials = {};
+            if (!this.cache.credentials.gmailAccount) this.cache.credentials.gmailAccount = {};
+
+            this.cache.credentials.gmailAccount.email = process.env.GMAIL_EMAIL;
+            this.cache.credentials.gmailAccount.clientId = process.env.GMAIL_CLIENT_ID;
+            this.cache.credentials.gmailAccount.clientSecret = process.env.GMAIL_CLIENT_SECRET;
+            this.cache.credentials.gmailAccount.refreshToken = process.env.GMAIL_REFRESH_TOKEN;
+
+            logger.info('Email credentials loaded from Environment Variables');
+        }
     }
 
     get() {
