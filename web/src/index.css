@@ -26,7 +26,7 @@
   --border: rgba(148, 163, 184, 0.1);
   --border-light: rgba(255, 255, 255, 0.1);
 
-  --glass: blur(12px);
+  --glass: blur(4px);
   --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --radius: 0.75rem;
 }
