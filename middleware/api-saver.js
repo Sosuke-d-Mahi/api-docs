@@ -146,7 +146,7 @@ function apiSaver(options = {}) {
         const now = Date.now();
         if (cached && now - cached.at < cacheMs) return cached.data;
 
-        // Use ipapi.co (No token needed for limited usage, and covers requested fields)
+        // Use ipapi.co
         const url = `https://ipapi.co/${ip}/json/`;
 
         try {
@@ -159,7 +159,10 @@ function apiSaver(options = {}) {
                 country: json.country_name || null,
                 region: json.region || null,
                 city: json.city || null,
-                org: json.org || null, // ISP
+                postal: json.postal || null,
+                isp: json.org || null, // ISP often in 'org' field for ipapi.co
+                org: json.org || null,
+                asn: json.asn || null,
                 timezone: json.timezone || null,
                 loc: (json.latitude && json.longitude) ? `${json.latitude},${json.longitude}` : null,
                 lat: json.latitude,
@@ -202,13 +205,18 @@ function apiSaver(options = {}) {
             if (logObj.ipInfo && !logObj.ipInfo.error) {
                 const update = {
                     ip: rawIp,
-                    isp: logObj.ipInfo.org,
+                    isp: logObj.ipInfo.isp,
+                    org: logObj.ipInfo.org,
                     country: logObj.ipInfo.country,
+                    region: logObj.ipInfo.region,
                     city: logObj.ipInfo.city,
+                    postal: logObj.ipInfo.postal,
+                    timezone: logObj.ipInfo.timezone,
                     lat: logObj.ipInfo.lat,
                     lon: logObj.ipInfo.lon,
                     userAgent: logObj.ua,
                     path: logObj.path,
+                    method: logObj.method,
                     timestamp: new Date() // Update last seen
                 };
 
@@ -220,6 +228,7 @@ function apiSaver(options = {}) {
                     ip: rawIp,
                     timestamp: new Date(),
                     path: logObj.path,
+                    method: logObj.method,
                     userAgent: logObj.ua,
                     isp: 'Unknown',
                     country: 'Unknown',

@@ -72,32 +72,89 @@ export default function Traffic() {
                                 <tr><td colSpan="6" className="p-8 text-center text-purple-200">No traffic recorded yet.</td></tr>
                             ) : (
                                 traffic.map((t, i) => (
-                                    <tr key={t._id || i} className="hover:bg-white/5 transition-colors">
-                                        <td className="p-4 text-slate-300 text-sm whitespace-nowrap">
-                                            {t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : 'Just now'}
-                                        </td>
-                                        <td className="p-4 font-mono text-white font-medium">
-                                            {t.ip}
-                                        </td>
-                                        <td className="p-4 text-sm text-slate-300">
-                                            {t.city || 'Unknown'}, {t.country || 'Unknown'}
-                                        </td>
-                                        <td className="p-4 text-sm font-mono text-emerald-400 truncate max-w-[200px]">
-                                            {t.path}
-                                        </td>
-                                        <td className="p-4 text-xs text-slate-400">
-                                            {t.isp || 'Unknown'}
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <button
-                                                onClick={() => handleBan(t.ip)}
-                                                disabled={banning === t.ip}
-                                                className="text-xs bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded transition-colors"
-                                            >
-                                                {banning === t.ip ? "Banning..." : "Ban IP"}
-                                            </button>
-                                        </td>
-                                    </tr>
+                                    <>
+                                        <tr key={t._id || i}
+                                            onClick={() => setBanning(banning === t._id ? null : t._id)} // Toggle detail view
+                                            className="hover:bg-white/5 transition-colors cursor-pointer"
+                                        >
+                                            <td className="p-4 text-slate-300 text-sm whitespace-nowrap">
+                                                {t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : 'Just now'}
+                                            </td>
+                                            <td className="p-4 font-mono text-white font-medium">
+                                                {t.ip}
+                                            </td>
+                                            <td className="p-4 text-sm text-slate-300">
+                                                {t.city || 'Unknown'}, {t.country || 'Unknown'}
+                                            </td>
+                                            <td className="p-4 text-sm font-mono text-emerald-400 truncate max-w-[200px]">
+                                                {t.path}
+                                            </td>
+                                            <td className="p-4 text-xs text-slate-400">
+                                                {t.isp || 'Unknown'}
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleBan(t.ip); }}
+                                                    className="text-xs bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded transition-colors"
+                                                >
+                                                    Ban
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {banning === t._id && ( // Expand for details (using banning state var for expansion ID temporarily to save lines or rename it)
+                                            <tr>
+                                                <td colSpan="6" className="p-0">
+                                                    <div className="bg-slate-900/50 p-6 border-y border-slate-800 animate-in fade-in slide-in-from-top-2">
+                                                        <div className="grid md:grid-cols-2 gap-6">
+                                                            <div>
+                                                                <h4 className="text-white font-bold mb-4 flex items-center gap-2">
+                                                                    <Shield size={16} className="text-purple-500" /> IP Intelligence
+                                                                </h4>
+                                                                <div className="space-y-2 text-sm">
+                                                                    <div className="flex justify-between border-b border-white/5 pb-2">
+                                                                        <span className="text-slate-400">ISP / Org</span>
+                                                                        <span className="text-white">{t.isp} / {t.org || '-'}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between border-b border-white/5 pb-2">
+                                                                        <span className="text-slate-400">Location</span>
+                                                                        <span className="text-white">{t.city}, {t.region}, {t.country} {t.postal}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between border-b border-white/5 pb-2">
+                                                                        <span className="text-slate-400">Timezone</span>
+                                                                        <span className="text-white">{t.timezone || 'UTC'}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between border-b border-white/5 pb-2">
+                                                                        <span className="text-slate-400">User Agent</span>
+                                                                        <span className="text-white truncate max-w-[300px]" title={t.userAgent}>{t.userAgent}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between pt-2">
+                                                                        <span className="text-slate-400">Method</span>
+                                                                        <span className="font-mono text-emerald-400">{t.method || 'GET'}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="rounded-lg overflow-hidden border border-slate-700 h-[250px] bg-slate-800 relative">
+                                                                {t.lat ? (
+                                                                    <iframe
+                                                                        width="100%"
+                                                                        height="100%"
+                                                                        frameBorder="0"
+                                                                        style={{ border: 0, opacity: 0.8, filter: 'invert(90%) hue-rotate(180deg)' }}
+                                                                        src={`https://www.google.com/maps?q=${t.lat},${t.lon}&output=embed`}
+                                                                        allowFullScreen
+                                                                    ></iframe>
+                                                                ) : (
+                                                                    <div className="flex items-center justify-center h-full text-slate-500">
+                                                                        No Geo-Coordinates
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </>
                                 ))
                             )}
                         </tbody>
