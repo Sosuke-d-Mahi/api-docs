@@ -55,8 +55,17 @@ router.post('/settings', adminAuth, async (req, res) => {
     }
 });
 
-router.get('/traffic', adminAuth, (req, res) => {
-    res.json({ status: true, data: getTraffic() });
+const Traffic = require('../models/Traffic');
+
+router.get('/traffic', adminAuth, async (req, res) => {
+    try {
+        // Fetch last 50 visits from MongoDB
+        const recentVisits = await Traffic.find().sort({ timestamp: -1 }).limit(200);
+        res.json({ status: true, data: recentVisits, source: 'db' });
+    } catch (e) {
+        // Fallback to local cache if DB fails
+        res.json({ status: true, data: getTraffic(), source: 'local' });
+    }
 });
 
 router.get('/banned-ips', adminAuth, (req, res) => {

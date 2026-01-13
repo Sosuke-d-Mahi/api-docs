@@ -3,16 +3,32 @@
 @tailwind utilities;
 
 :root {
-  --bg-dark: #030014;
+  /* Lovable / Lauda Dark Theme - Adapted for Transparency */
+  --bg-dark: transparent;
+  /* Changed to transparent to show wallpaper */
   --bg-card: rgba(15, 23, 42, 0.6);
+  /* Semi-transparent */
   --bg-card-hover: rgba(30, 41, 59, 0.8);
+  --bg-sidebar: rgba(15, 17, 23, 0.8);
+  /* Semi-transparent sidebar */
+
   --primary: #8b5cf6;
-  --primary-glow: rgba(139, 92, 246, 0.5);
+  /* Revert to Purple/Pink vibe if requested, or keep Blue. User liked 'super design'. keeping blue for now but maybe more neon? Let's tick to solid colors but transparent bg */
+  --primary-hover: #7c3aed;
+
+  --accent-purple: #8b5cf6;
+  --accent-green: #10b981;
+
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+
   --border: rgba(148, 163, 184, 0.1);
-  --glass: blur(16px);
-  --text-stroke-color: rgba(255, 255, 255, 0.95);
+  --border-light: rgba(255, 255, 255, 0.1);
+
+  --glass: blur(12px);
+  --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --radius: 0.75rem;
 }
 
 body {
@@ -46,29 +62,39 @@ body {
 }
 
 /* Component Styles */
+/* Component Styles */
 .glass-panel {
   background: var(--bg-card);
   backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
 }
 
 .btn-primary {
-  background-image: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
-  color: transparent !important;
-  /* Even buttons get the outline treatment as requested */
-  -webkit-text-stroke: 1px white !important;
+  background: var(--primary);
+  color: white !important;
+  -webkit-text-stroke: 0 !important;
+  /* Remove stroke */
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.2s ease;
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px var(--primary-glow);
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .gradient-text {

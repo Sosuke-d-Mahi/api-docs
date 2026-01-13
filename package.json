@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "node --max-old-space-size=460 --no-deprecation app.js",
-    "build": "cd web && npm install && npm run build && echo 'BUILD COMPLETE. LISTING DIST:' && ls -R ../dist",
+    "build": "cd web && npm install && npm run build",
     "postinstall": "npm run build"
   },
   "author": "Easir Iqbal Mahi",

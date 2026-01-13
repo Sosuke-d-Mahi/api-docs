@@ -24,5 +24,31 @@
       "GET /login",
       "GET /login"
     ]
+  },
+  "127.0.0.1": {
+    "ip": "127.0.0.1",
+    "count": 33,
+    "firstSeen": 1768231725355,
+    "lastSeen": 1768308448000,
+    "paths": [
+      "GET /admin/traffic",
+      "GET /favicon.ico",
+      "GET /api/tiktok?search=laund&apikey=god-mahi-jyyizohw-9i1h",
+      "GET /admin/traffic",
+      "GET /favicon.ico"
+    ]
+  },
+  "::ffff:192.168.1.100": {
+    "ip": "::ffff:192.168.1.100",
+    "count": 13,
+    "firstSeen": 1768306083578,
+    "lastSeen": 1768306187532,
+    "paths": [
+      "GET /admin/traffic",
+      "GET /favicon.ico",
+      "GET /api/tiktok?search=sabrina%20hot&apikey=god-mahi-jyyizohw-9i1h",
+      "GET /favicon.ico",
+      "GET /api/tiktok?search=sabrina%20hot&apikey="
+    ]
   }
 }

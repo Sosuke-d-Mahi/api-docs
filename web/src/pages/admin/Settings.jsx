@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Save, Lock, Layout, Globe, Bell, Link as LinkIcon, Plus, Trash2, Image as ImageIcon, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../../context/AuthContext';
 
 const TabButton = ({ active, icon: Icon, label, onClick }) => (
     <button
@@ -22,27 +23,27 @@ const InputGroup = ({ label, desc, children }) => (
 );
 
 const SecurityTab = () => {
+    const { user } = useAuth();
     const [bannedIps, setBannedIps] = useState([]);
     const [newBan, setNewBan] = useState("");
     const [processing, setProcessing] = useState(false);
 
     const fetchBans = () => {
-        const key = localStorage.getItem("adminKey") || "easir-secret-key-123";
-        axios.get('/api/admin/banned-ips', { headers: { 'x-admin-key': key } })
+        if (!user || !user.apikey) return;
+        axios.get('/api/admin/banned-ips', { headers: { 'Authorization': user.apikey } })
             .then(res => setBannedIps(res.data.data))
             .catch(console.error);
     };
 
     useEffect(() => {
         fetchBans();
-    }, []);
+    }, [user]);
 
     const handleBan = async () => {
-        if (!newBan) return;
+        if (!newBan || !user || !user.apikey) return;
         setProcessing(true);
-        const key = localStorage.getItem("adminKey") || "easir-secret-key-123";
         try {
-            await axios.post('/api/admin/ban-ip', { ip: newBan }, { headers: { 'x-admin-key': key } });
+            await axios.post('/api/admin/ban-ip', { ip: newBan }, { headers: { 'Authorization': user.apikey } });
             setNewBan("");
             fetchBans();
         } catch (e) {
@@ -53,9 +54,9 @@ const SecurityTab = () => {
     };
 
     const handleUnban = async (ip) => {
-        const key = localStorage.getItem("adminKey") || "easir-secret-key-123";
+        if (!user || !user.apikey) return;
         try {
-            await axios.post('/api/admin/unban-ip', { ip: ip }, { headers: { 'x-admin-key': key } });
+            await axios.post('/api/admin/unban-ip', { ip: ip }, { headers: { 'Authorization': user.apikey } });
             fetchBans();
         } catch (e) {
             console.error(e);
@@ -110,6 +111,7 @@ const SecurityTab = () => {
 };
 
 export default function Settings() {
+    const { user } = useAuth();
     const [data, setData] = useState(null);
     const [activeTab, setActiveTab] = useState('general');
     const [status, setStatus] = useState('');
@@ -117,22 +119,21 @@ export default function Settings() {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        const key = localStorage.getItem("adminKey") || "easir-secret-key-123";
+        if (!user || !user.apikey) return;
 
-        axios.get('/api/admin/settings', { headers: { 'x-admin-key': key } })
+        axios.get('/api/admin/settings', { headers: { 'Authorization': user.apikey } })
             .then(res => setData(res.data.data))
             .catch((err) => {
                 console.error(err);
                 setLocked(true);
             });
-    }, []);
+    }, [user]);
 
     const handleSave = () => {
-        if (locked) return;
+        if (locked || !user || !user.apikey) return;
         setSaving(true);
-        const key = localStorage.getItem("adminKey") || "easir-secret-key-123";
 
-        axios.post('/api/admin/settings', data, { headers: { 'x-admin-key': key } })
+        axios.post('/api/admin/settings', data, { headers: { 'Authorization': user.apikey } })
             .then(() => {
                 setStatus('Settings saved successfully.');
                 setTimeout(() => setStatus(''), 3000);

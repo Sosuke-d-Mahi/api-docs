@@ -1,44 +1,35 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Shield, RefreshCw, AlertTriangle, Eye, Clock, Hash } from 'lucide-react';
-import io from 'socket.io-client';
+import { Shield, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Traffic() {
     const { user } = useAuth();
-    const [traffic, setTraffic] = useState({});
+    const [traffic, setTraffic] = useState([]);
     const [loading, setLoading] = useState(true);
     const [banning, setBanning] = useState(null);
 
-    const fetchTraffic = () => {
+    const fetchTraffic = async () => {
         if (!user || !user.apikey) return;
 
-        axios.get('/api/admin/traffic', {
-            headers: { 'Authorization': user.apikey }
-        })
-            .then(res => {
-                setTraffic(res.data.data);
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error(err);
-                setLoading(false);
+        try {
+            const res = await axios.get('/api/admin/traffic', {
+                headers: { 'Authorization': user.apikey }
             });
+            if (res.data.status && Array.isArray(res.data.data)) {
+                setTraffic(res.data.data);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
-        if (user) fetchTraffic();
-
-        const socket = io();
-
-        socket.on('traffic_update', (data) => {
-            setTraffic(prev => ({
-                ...prev,
-                [data.ip]: data
-            }));
-        });
-
-        return () => socket.disconnect();
+        fetchTraffic();
+        const interval = setInterval(fetchTraffic, 2000); // Poll every 2s for live feel
+        return () => clearInterval(interval);
     }, [user]);
 
     const handleBan = async (ip) => {
@@ -56,52 +47,46 @@ export default function Traffic() {
         }
     };
 
-    const sortedTraffic = Object.values(traffic).sort((a, b) => b.lastSeen - a.lastSeen);
-
     return (
         <div className="max-w-6xl mx-auto">
-            <h1 className="text-3xl font-bold text-black mb-2">Live Traffic Monitor</h1>
-            <p className="text-slate-400 mb-8">Real-time tracking of all IP addresses accessing the API.</p>
+            <h1 className="text-3xl font-bold text-white mb-2">Live Traffic Log</h1>
+            <p className="text-slate-400 mb-8">Real-time usage history (Last 50 requests).</p>
 
             <div className="glass-panel overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-white/5 border-b border-white/5 text-purple-300 text-xs uppercase tracking-wider">
+                                <th className="p-4 font-bold">Time</th>
                                 <th className="p-4 font-bold">IP Address</th>
-                                <th className="p-4 font-bold">Requests</th>
-                                <th className="p-4 font-bold">Last Seen</th>
-                                <th className="p-4 font-bold">Recent Activity</th>
+                                <th className="p-4 font-bold">Location</th>
+                                <th className="p-4 font-bold">Path</th>
+                                <th className="p-4 font-bold">ISP</th>
                                 <th className="p-4 font-bold text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {loading ? (
-                                <tr><td colSpan="5" className="p-8 text-center text-purple-200">Loading traffic data...</td></tr>
-                            ) : sortedTraffic.length === 0 ? (
-                                <tr><td colSpan="5" className="p-8 text-center text-purple-200">No traffic recorded yet.</td></tr>
+                            {loading && traffic.length === 0 ? (
+                                <tr><td colSpan="6" className="p-8 text-center text-purple-200">Loading live traffic...</td></tr>
+                            ) : traffic.length === 0 ? (
+                                <tr><td colSpan="6" className="p-8 text-center text-purple-200">No traffic recorded yet.</td></tr>
                             ) : (
-                                sortedTraffic.map((t) => (
-                                    <tr key={t.ip} className="hover:bg-white/5 transition-colors">
-                                        <td className="p-4 font-mono text-white font-medium flex items-center gap-2">
+                                traffic.map((t, i) => (
+                                    <tr key={t._id || i} className="hover:bg-white/5 transition-colors">
+                                        <td className="p-4 text-slate-300 text-sm whitespace-nowrap">
+                                            {t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : 'Just now'}
+                                        </td>
+                                        <td className="p-4 font-mono text-white font-medium">
                                             {t.ip}
                                         </td>
-                                        <td className="p-4">
-                                            <span className="bg-purple-500/10 text-purple-400 px-2 py-1 rounded text-xs font-bold">
-                                                {t.count}
-                                            </span>
+                                        <td className="p-4 text-sm text-slate-300">
+                                            {t.city || 'Unknown'}, {t.country || 'Unknown'}
                                         </td>
-                                        <td className="p-4 text-slate-300 text-sm">
-                                            {new Date(t.lastSeen).toLocaleTimeString()}
+                                        <td className="p-4 text-sm font-mono text-emerald-400 truncate max-w-[200px]">
+                                            {t.path}
                                         </td>
-                                        <td className="p-4">
-                                            <div className="flex flex-col gap-1">
-                                                {t.paths.slice(0, 2).map((p, i) => (
-                                                    <span key={i} className="text-xs text-purple-200 truncate max-w-[200px] block font-mono">
-                                                        {p}
-                                                    </span>
-                                                ))}
-                                            </div>
+                                        <td className="p-4 text-xs text-slate-400">
+                                            {t.isp || 'Unknown'}
                                         </td>
                                         <td className="p-4 text-right">
                                             <button

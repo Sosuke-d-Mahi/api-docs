@@ -8,7 +8,7 @@ const si = require('systeminformation');
 const logger = require('./utils/logger');
 const apiKeyAuth = require('./middleware/apiKeyAuth');
 const ipGuard = require('./middleware/ipGuard');
-const { trafficLogger } = require('./middleware/trafficLogger');
+const { apiSaver, createLogViewerRouter } = require('./middleware/api-saver');
 
 const connectDB = require('./utils/db');
 const settingsManager = require('./utils/settingsManager');
@@ -22,6 +22,7 @@ connectDB(MONGO_URI).then(() => {
 const app = express();
 const server = http.createServer(app);
 
+app.set("trust proxy", true); // IMPORTANT per user request
 app.enable("trust proxy");
 app.set("json spaces", 2);
 
@@ -29,6 +30,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cors());
 
+// Internal Settings Wrapper
 app.use((req, res, next) => {
     const originalJson = res.json;
     res.json = function (data) {
@@ -46,8 +48,23 @@ app.use((req, res, next) => {
     next();
 });
 
+app.use(apiSaver({
+    serviceName: "easir-api",
+    logDir: "./logs",
+    ipMode: "raw", // User wants full info visible
+    enableEnrichment: true,
+    identifyClient: (req) => req.headers["x-api-key"] || "anonymous"
+}));
+
+// Admin Logs Viewer
+app.use("/admin/system-logs", createLogViewerRouter({
+    logDir: "./logs",
+    accessToken: "easir-secret-key-123" // Hardcoded matching legacy key for now
+}));
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/tracking', require('./routes/tracking'));
 
 // DEBUGGING LOGS
 const webDistPath = path.join(__dirname, 'dist');
@@ -84,7 +101,7 @@ app.use('/', express.static(webDistPath, {
 }));
 
 app.use(ipGuard);
-app.use(trafficLogger);
+// app.use(trafficLogger); // Replaced by apiSaver
 
 app.get('/api/docs', (req, res) => {
     try {

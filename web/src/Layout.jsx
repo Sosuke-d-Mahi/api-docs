@@ -1,20 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { Home, Book, LayoutDashboard, Settings, Shield, Menu, X, User, LogOut, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from './context/AuthContext';
 import RainBackground from './components/RainBackground';
 
+
 const SidebarItem = ({ to, icon: Icon, label, active, onClick }) => (
     <Link to={to} style={{ textDecoration: 'none' }} onClick={onClick}>
-        <motion.div
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-2 cursor-pointer transition-colors ${active ? 'bg-purple-500/10 text-white shadow-sm shadow-purple-500/20' : 'text-slate-300 hover:text-white hover:bg-white/5'}`}
-            whileHover={{ x: 5 }}
+        <div
+            className={`flex items-center gap-3 px-3 py-2 rounded-md mb-1 cursor-pointer transition-colors text-sm font-medium ${active ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
         >
-            <Icon size={20} />
-            <span className="font-medium">{label}</span>
-            {active && <motion.div layoutId="active" className="absolute left-0 w-1 h-8 bg-purple-500 rounded-r-full" />}
-        </motion.div>
+            <Icon size={18} />
+            <span>{label}</span>
+        </div>
     </Link>
 );
 
@@ -24,25 +24,30 @@ export default function Layout({ children }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const { user, logout } = useAuth();
 
+    // useEffect(() => {
+    //     // Frontend tracking removed in favor of Server-Side TrafficLogger to avoid CORS and Adblockers.
+    // }, []);
+
     if (p === '/login') return children;
 
     const SidebarContent = () => (
         <>
-            <div className="p-6 border-b border-white/5 flex justify-between items-center">
-                <h1 className="text-xl font-bold text-black flex items-center gap-2 drop-shadow-sm">
-                    <Shield className="text-purple-500" /> Easir API
+            <div className="px-6 py-5 border-b border-slate-800 flex justify-between items-center bg-[var(--bg-sidebar)]">
+                <h1 className="text-lg font-bold text-white flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-xs">E</div>
+                    Easir API
                 </h1>
-                <button className="md:hidden text-purple-200" onClick={() => setMobileMenuOpen(false)}>
-                    <X size={24} />
+                <button className="md:hidden text-slate-400" onClick={() => setMobileMenuOpen(false)}>
+                    <X size={20} />
                 </button>
             </div>
 
-            <nav className="flex-1 p-4 overflow-y-auto">
-                <p className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 uppercase mb-4 px-2 tracking-widest drop-shadow-sm">Menu</p>
+            <nav className="flex-1 px-3 py-4 overflow-y-auto bg-[var(--bg-sidebar)]">
+                <p className="text-xs font-semibold text-slate-500 uppercase mb-3 px-3 tracking-wider">Overview</p>
                 <SidebarItem to="/" icon={Home} label="Overview" active={p === '/'} onClick={() => setMobileMenuOpen(false)} />
                 <SidebarItem to="/docs" icon={Book} label="Documentation" active={p === '/docs'} onClick={() => setMobileMenuOpen(false)} />
 
-                <p className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 uppercase mt-6 mb-4 px-2 tracking-widest drop-shadow-sm">Admin</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase mt-6 mb-3 px-3 tracking-wider">Admin</p>
                 <SidebarItem to="/admin/dashboard" icon={LayoutDashboard} label="Dashboard" active={p.includes('/admin/dashboard')} onClick={() => setMobileMenuOpen(false)} />
                 <SidebarItem to="/profile" icon={User} label="Profile" active={p === '/profile'} onClick={() => setMobileMenuOpen(false)} />
 
@@ -54,32 +59,30 @@ export default function Layout({ children }) {
                 )}
             </nav>
 
-            <div className="p-4 border-t border-white/5">
+            <div className="p-3 border-t border-slate-800 bg-[var(--bg-sidebar)]">
                 {user ? (
                     <div
-                        className="flex items-center gap-3 p-2 rounded-lg bg-white/5 cursor-pointer hover:bg-red-500/10 hover:border-red-500/20 border border-transparent transition-all group"
+                        className="flex items-center gap-3 p-2 rounded-md hover:bg-white/5 cursor-pointer transition-colors group"
                         onClick={logout}
                     >
-                        <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
-                            <User size={16} className="text-white" />
+                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-medium text-xs">
+                            {user.name.charAt(0)}
                         </div>
                         <div className="overflow-hidden flex-1">
-                            <p className="text-sm font-medium truncate">{user.name}</p>
-                            <p className="text-xs text-red-400 truncate group-hover:text-red-300 transition-colors">Sign Out</p>
+                            <p className="text-sm font-medium text-slate-200 truncate">{user.name}</p>
+                            <p className="text-xs text-slate-500 truncate">Sign out</p>
                         </div>
-                        <LogOut size={16} className="text-red-400 group-hover:text-red-300 transition-colors" />
+                        <LogOut size={16} className="text-slate-500 group-hover:text-slate-300" />
                     </div>
                 ) : (
                     <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
-                        <div
-                            className="flex items-center gap-3 p-2 rounded-lg bg-black/20 cursor-pointer hover:bg-white/5 transition-colors"
-                        >
-                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
-                                <User size={16} className="text-white" />
+                        <div className="flex items-center gap-3 p-2 rounded-md hover:bg-white/5 cursor-pointer transition-colors">
+                            <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">
+                                <User size={16} className="text-slate-400" />
                             </div>
-                            <div className="overflow-hidden">
-                                <p className="text-sm font-medium truncate">Guest User</p>
-                                <p className="text-xs text-purple-200 truncate">Click to Login</p>
+                            <div>
+                                <p className="text-sm font-medium text-slate-300">Guest</p>
+                                <p className="text-xs text-slate-500">Login</p>
                             </div>
                         </div>
                     </Link>
@@ -89,51 +92,51 @@ export default function Layout({ children }) {
     );
 
     return (
-        <div className="flex min-h-screen relative">
+        <div className="flex min-h-screen text-[var(--text-main)] font-sans relative">
             <RainBackground />
-
-            <div className="md:hidden fixed top-0 w-full glass-panel z-40 px-6 py-4 flex justify-between items-center m-0 rounded-none border-x-0 border-t-0">
-                <h1 className="text-xl font-bold text-black flex items-center gap-2 drop-shadow-sm">
-                    <Shield className="text-purple-500" /> Easir API
+            {/* Mobile Header */}
+            <div className="md:hidden fixed top-0 w-full bg-[var(--bg-sidebar)] border-b border-slate-800 z-40 px-4 py-3 flex justify-between items-center">
+                <h1 className="text-lg font-bold text-white flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-xs">E</div>
+                    Easir API
                 </h1>
                 <button onClick={() => setMobileMenuOpen(true)}>
-                    <Menu className="text-white" />
+                    <Menu className="text-slate-400" />
                 </button>
             </div>
 
-            <aside className="hidden md:flex w-64 glass-panel m-4 flex-col fixed h-[calc(100vh-2rem)] z-50 rounded-2xl border-white/5">
+            {/* Desktop Sidebar */}
+            <aside className="hidden md:flex w-64 flex-col fixed inset-y-0 border-r border-slate-800 bg-[var(--bg-sidebar)] z-50">
                 <SidebarContent />
             </aside>
 
+            {/* Mobile Sidebar Overlay */}
             <AnimatePresence>
                 {mobileMenuOpen && (
-                    <motion.div
-                        initial={{ x: -300 }}
-                        animate={{ x: 0 }}
-                        exit={{ x: -300 }}
-                        className="fixed inset-y-0 left-0 w-64 bg-dark-900 border-r border-white/10 z-50 flex flex-col md:hidden"
-                    >
-                        <SidebarContent />
-                    </motion.div>
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+                            onClick={() => setMobileMenuOpen(false)}
+                        />
+                        <motion.div
+                            initial={{ x: -300 }}
+                            animate={{ x: 0 }}
+                            exit={{ x: -300 }}
+                            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                            className="fixed inset-y-0 left-0 w-72 bg-[var(--bg-sidebar)] border-r border-slate-800 z-50 flex flex-col md:hidden"
+                        >
+                            <SidebarContent />
+                        </motion.div>
+                    </>
                 )}
             </AnimatePresence>
 
-            {mobileMenuOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 md:hidden"
-                    onClick={() => setMobileMenuOpen(false)}
-                />
-            )}
-
-            <main className="flex-1 md:ml-[calc(16rem+2rem)] p-4 pt-20 md:p-8 md:pt-8 w-full overflow-x-hidden">
-                <motion.div
-                    key={location.pathname}
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.3 }}
-                >
-                    {children || <Outlet />}
-                </motion.div>
+            {/* Main Content */}
+            <main className="flex-1 md:ml-64 p-6 pt-20 md:p-8 md:pt-8 w-full">
+                {children || <Outlet />}
             </main>
         </div>
     );
