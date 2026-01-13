@@ -1,0 +1,40 @@
+{
+  "name": "web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node --max-old-space-size=460 ./node_modules/vite/bin/vite.js build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tsparticles/react": "^3.0.0",
+    "@tsparticles/slim": "^3.9.1",
+    "@vitejs/plugin-react": "^5.1.1",
+    "autoprefixer": "^10.4.23",
+    "axios": "^1.13.2",
+    "framer-motion": "^12.23.26",
+    "lucide-react": "^0.562.0",
+    "postcss": "^8.5.6",
+    "raindrop-fx": "^1.0.8",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.11.0",
+    "recharts": "^3.6.0",
+    "socket.io-client": "^4.8.3",
+    "tailwindcss": "^3.4.17",
+    "tsparticles": "^3.9.1",
+    "vite": "^7.2.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0"
+  }
+}

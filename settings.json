@@ -1,0 +1,48 @@
+{
+  "name": "Easir APIs",
+  "version": "v2.0.0",
+  "description": "Premium High-Performance API Service",
+  "header": {
+    "status": "Operational",
+    "imageSrc": [
+      "https://i0.wp.com/donnykimball.com/wp-content/uploads/2024/05/An-Illustration-of-Miyamoto-Musashi.webp?fit=800%2C450&ssl=1"
+    ],
+    "imageSize": {
+      "mobile": "100%",
+      "tablet": "100%",
+      "desktop": "100%"
+    }
+  },
+  "apiSettings": {
+    "operator": "Easir Iqbal Mahi"
+  },
+  "links": [
+    {
+      "name": "GitHub (Easir)",
+      "url": "https://github.com/sosuke-d-mahi"
+    },
+    {
+      "name": "Contact",
+      "url": "easiriqbalmahi@gmail.com"
+    }
+  ],
+  "notifications": [
+    {
+      "title": "Welcome to Easir API v2",
+      "message": "Experience the next generation of API services."
+    }
+  ],
+  "credentials": {
+    "gmailAccount": {
+      "email": "xemonbae@gmail.com",
+      "clientId": "703210852639-ic8u4br6bdo6jg6dgguirqi7jkgbpl6l.apps.googleusercontent.com",
+      "clientSecret": "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",
+      "refreshToken": "1//04svAaCtGHs-ICgYIARAAGAQSNwF-L9IrjiQvNzr409HIVspHncIVnrz7ZI5VxTU3dvw5TwHLZi1BhYEwEJNs9YpLDm7xDEBt1fU",
+      "apiKey": ""
+    },
+    "gRecaptcha": {
+      "siteKey": "6LesKYgpAAAAAOKKCkeeHYPSi0ublhQ0wRa6Axuq",
+      "secretKey": "6LesKYgpAAAAAL4fodXBHXocKQzvP9uXLFvavI18"
+    }
+  }
+}

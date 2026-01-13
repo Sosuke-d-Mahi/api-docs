@@ -1,0 +1,18 @@
+[
+  {
+    "username": "easiriqbalmahi@gmail.com",
+    "password": "npm start",
+    "name": "Easir Iqbal Mahi",
+    "email": "easiriqbalmahi@gmail.com",
+    "role": "admin",
+    "apikey": "god-mahi-jyyizohw-9i1h"
+  },
+  {
+    "username": "mahi",
+    "password": "6244",
+    "name": "Mahi Admin",
+    "email": "mahi@admin.local",
+    "role": "admin",
+    "apikey": "god-mahi-manual-entry"
+  }
+]
