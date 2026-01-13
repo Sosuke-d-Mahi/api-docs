@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const https = require("https");
+const http = require("http"); // Added http module
 const Traffic = require('../models/Traffic'); // Added: Import Mongoose Model
 
 // -------------------- Helpers --------------------
@@ -88,22 +89,22 @@ function safeJsonParse(line) {
     try { return JSON.parse(line); } catch { return null; }
 }
 
-function httpGetJson(url) {
+// Generic getJson that handles both http and https
+function getJson(url) {
     return new Promise((resolve, reject) => {
-        https
-            .get(url, (res) => {
-                let data = "";
-                res.on("data", (chunk) => (data += chunk));
-                res.on("end", () => {
-                    try {
-                        const json = JSON.parse(data);
-                        resolve({ status: res.statusCode, json });
-                    } catch (e) {
-                        reject(new Error("Failed to parse JSON response"));
-                    }
-                });
-            })
-            .on("error", reject);
+        const client = url.startsWith("https") ? https : http;
+        client.get(url, (res) => {
+            let data = "";
+            res.on("data", (chunk) => (data += chunk));
+            res.on("end", () => {
+                try {
+                    const json = JSON.parse(data);
+                    resolve({ status: res.statusCode, json });
+                } catch (e) {
+                    reject(new Error("Failed to parse JSON response"));
+                }
+            });
+        }).on("error", reject);
     });
 }
 
@@ -146,33 +147,32 @@ function apiSaver(options = {}) {
         const now = Date.now();
         if (cached && now - cached.at < cacheMs) return cached.data;
 
-        // Use ipapi.co
-        const url = `https://ipapi.co/${ip}/json/`;
+        // Use ip-api.com (HTTP) - More reliable for free tier
+        const url = `http://ip-api.com/json/${ip}`;
 
         try {
-            const { status, json } = await httpGetJson(url);
-            if (json.error) throw new Error(json.reason || "API Error");
+            const { status, json } = await getJson(url);
+            if (json.status !== 'success') throw new Error(json.message || "API Error");
 
             const data = {
-                provider: "ipapi.co",
+                provider: "ip-api.com",
                 status,
-                country: json.country_name || null,
-                region: json.region || null,
+                country: json.country || null,
+                region: json.regionName || null,
                 city: json.city || null,
-                postal: json.postal || null,
-                isp: json.org || null, // ISP often in 'org' field for ipapi.co
+                postal: json.zip || null,
+                isp: json.isp || null,
                 org: json.org || null,
-                asn: json.asn || null,
+                asn: json.as || null,
                 timezone: json.timezone || null,
-                loc: (json.latitude && json.longitude) ? `${json.latitude},${json.longitude}` : null,
-                lat: json.latitude,
-                lon: json.longitude
+                loc: (json.lat && json.lon) ? `${json.lat},${json.lon}` : null,
+                lat: json.lat,
+                lon: json.lon
             };
             enrichCache.set(ip, { at: now, data });
             return data;
         } catch (e) {
-            // Fallback or error
-            const data = { provider: "ipapi.co", error: e.message || "enrichment failed" };
+            const data = { provider: "ip-api.com", error: e.message || "enrichment failed" };
             enrichCache.set(ip, { at: now, data });
             return data;
         }
