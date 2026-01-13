@@ -59,9 +59,26 @@ const Traffic = require('../models/Traffic');
 
 router.get('/traffic', adminAuth, async (req, res) => {
     try {
-        // Fetch last 50 visits from MongoDB
-        const recentVisits = await Traffic.find().sort({ timestamp: -1 }).limit(200);
-        res.json({ status: true, data: recentVisits, source: 'db' });
+        const limit = parseInt(req.query.limit) || 20;
+        const page = parseInt(req.query.page) || 1;
+        const skip = (page - 1) * limit;
+
+        const total = await Traffic.countDocuments();
+        const visits = await Traffic.find()
+            .sort({ timestamp: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        res.json({
+            status: true,
+            data: visits,
+            pagination: {
+                total,
+                page,
+                pages: Math.ceil(total / limit)
+            },
+            source: 'db'
+        });
     } catch (e) {
         // Fallback to local cache if DB fails
         res.json({ status: true, data: getTraffic(), source: 'local' });
