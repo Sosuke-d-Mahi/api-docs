@@ -1,10 +1,5 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Shield, RefreshCw } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-
-import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { Shield, RefreshCw, History, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -97,8 +92,8 @@ export default function Traffic() {
                     <button
                         onClick={() => setActiveTab('live')}
                         className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'live'
-                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
                             }`}
                     >
                         <Activity size={16} /> Live Traffic
@@ -106,8 +101,8 @@ export default function Traffic() {
                     <button
                         onClick={() => setActiveTab('history')}
                         className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'history'
-                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
                             }`}
                     >
                         <History size={16} /> History
