@@ -123,27 +123,10 @@ const ensureAdminExists = async () => {
     }
 };
 
-    let users = getUsers();
-    const exists = users.find(u => u.username === adminUser.username);
-
-    if (!exists) {
-        console.log("Seeding Admin User 'mahi'...");
-        users.push(adminUser);
-        await saveUsers(users); // This will save to JSON AND Mongo
-    } else {
-        // Even if exists locally, ensure it's in Mongo
-        try {
-            await User.findOneAndUpdate(
-                { email: adminUser.email },
-                adminUser,
-                { upsert: true, new: true }
-            );
-        } catch (e) { console.error("Admin Mongo Sync Fail:", e.message); }
-    }
-};
-
 // Run immediately
-ensureAdminExists();
+ensureAdminExists().catch((error) => {
+    console.error("[Auth] Failed to ensure admin exists:", error.message);
+});
 
 router.post('/send-otp', async (req, res) => {
     try {
@@ -260,61 +243,66 @@ router.post('/send-otp', async (req, res) => {
     }
 });
 
-router.post('/register', (req, res) => {
-    const { email, code } = req.body;
+router.post('/register', async (req, res) => {
+    try {
+        const { email, code } = req.body;
 
-    if (!email || !code) {
-        return res.status(400).json({ status: false, message: "Email and Code required" });
-    }
+        if (!email || !code) {
+            return res.status(400).json({ status: false, message: "Email and Code required" });
+        }
 
-    const normalizedEmail = email.toLowerCase();
-    const pending = otpStore.get(normalizedEmail);
+        const normalizedEmail = email.toLowerCase();
+        const pending = otpStore.get(normalizedEmail);
 
-    if (!pending) {
-        return res.json({ status: false, message: "Registration session expired or invalid." });
-    }
+        if (!pending) {
+            return res.json({ status: false, message: "Registration session expired or invalid." });
+        }
 
-    if (Date.now() > pending.expires) {
+        if (Date.now() > pending.expires) {
+            otpStore.delete(normalizedEmail);
+            saveOtpToFile();
+            return res.json({ status: false, message: "Code expired. Please try again." });
+        }
+
+        if (pending.code !== code.toString()) {
+            return res.json({ status: false, message: "Invalid Verification Code." });
+        }
+
+        const users = getUsers();
+
+        if (users.find(u => u.username.toLowerCase() === pending.username.toLowerCase())) {
+            return res.json({ status: false, message: "Username already taken." });
+        }
+
+        const isAdmin = normalizedEmail === 'easiriqbalmahi@gmail.com';
+
+        const newUser = {
+            username: pending.username,
+            password: pending.password,
+            name: pending.name,
+            email: normalizedEmail,
+            role: isAdmin ? "admin" : "user",
+            apikey: generateApiKey(),
+            banned: false,
+            credits: 1000,
+            creditLimit: -1
+        };
+
+        users.push(newUser);
+        await saveUsers(users);
+
         otpStore.delete(normalizedEmail);
         saveOtpToFile();
-        return res.json({ status: false, message: "Code expired. Please try again." });
+
+        res.json({
+            status: true,
+            message: isAdmin ? "Registration Successful (Admin Access Granted)" : "Registration Successful",
+            apikey: newUser.apikey
+        });
+    } catch (error) {
+        console.error("[Auth] /register Error:", error);
+        res.status(500).json({ status: false, message: "Internal Server Error" });
     }
-
-    if (pending.code !== code.toString()) {
-        return res.json({ status: false, message: "Invalid Verification Code." });
-    }
-
-    const users = getUsers();
-
-    if (users.find(u => u.username.toLowerCase() === pending.username.toLowerCase())) {
-        return res.json({ status: false, message: "Username already taken." });
-    }
-
-    const isAdmin = normalizedEmail === 'easiriqbalmahi@gmail.com';
-
-    const newUser = {
-        username: pending.username,
-        password: pending.password,
-        name: pending.name,
-        email: normalizedEmail,
-        role: isAdmin ? "admin" : "user",
-        apikey: generateApiKey(),
-        banned: false,
-        credits: 1000,
-        creditLimit: -1
-    };
-
-    users.push(newUser);
-    saveUsers(users);
-
-    otpStore.delete(normalizedEmail);
-    saveOtpToFile();
-
-    res.json({
-        status: true,
-        message: isAdmin ? "Registration Successful (Admin Access Granted)" : "Registration Successful",
-        apikey: newUser.apikey
-    });
 });
 
 router.post('/login', (req, res) => {
