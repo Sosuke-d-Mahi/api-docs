@@ -37,7 +37,7 @@ export default function Home() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
                 >
-                    Build faster with <span className="text-blue-500">Easir API</span>
+                    Build faster with <span className="text-blue-500">Velrith API</span>
                 </motion.h1>
 
                 <motion.p
@@ -60,7 +60,7 @@ export default function Home() {
                         Start Building <ArrowRight size={18} />
                     </Link>
                     <a
-                        href="https://github.com/Sosuke-d-Mahi/Easir-docs.git"
+                        href="https://github.com/Sosuke-d-Mahi/api-docs"
                         target="_blank"
                         rel="noreferrer"
                         className="px-8 py-3 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors font-medium flex items-center gap-2"
@@ -92,7 +92,7 @@ export default function Home() {
             </div>
 
             <div className="border-t border-slate-800 pt-10 pb-10 flex flex-col md:flex-row justify-between items-center text-slate-500 text-sm">
-                <p>&copy; 2026 Easir API. All rights reserved.</p>
+                <p>&copy; 2026 Velrith API. All rights reserved.</p>
                 <div className="flex gap-6 mt-4 md:mt-0">
                     <a href="#" className="hover:text-slate-300 transition-colors">Privacy</a>
                     <a href="#" className="hover:text-slate-300 transition-colors">Terms</a>

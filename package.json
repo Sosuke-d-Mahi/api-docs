@@ -1,7 +1,7 @@
 {
-  "name": "easir-api-v2",
+  "name": "velrith-api-v2",
   "version": "2.0.0",
-  "description": "Premium High-Performance API Service engineered by Easir Iqbal Mahi.",
+  "description": "Premium High-Performance API Service rebranded as Velrith API.",
   "main": "app.js",
   "type": "commonjs",
   "scripts": {

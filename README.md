@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="https://i0.wp.com/donnykimball.com/wp-content/uploads/2024/05/An-Illustration-of-Miyamoto-Musashi.webp?fit=800%2C450&ssl=1" alt="Easir API Banner" width="100%" style="border-radius: 10px; margin-bottom: 20px;">
+  <img src="https://i0.wp.com/donnykimball.com/wp-content/uploads/2024/05/An-Illustration-of-Miyamoto-Musashi.webp?fit=800%2C450&ssl=1" alt="Velrith API Banner" width="100%" style="border-radius: 10px; margin-bottom: 20px;">
 
-  # ⚡ Easir API v2 ⚡
+  # ⚡ Velrith API v2 ⚡
   
   [![Node.js](https://img.shields.io/badge/Node.js-v20-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
   [![React](https://img.shields.io/badge/React-v18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
@@ -28,7 +28,7 @@
 
 ## 🌟 About the Project
 
-**Easir API v2** is a robust, full-stack API service designed for high performance and scalability. It combines a powerful **Node.js/Express** backend with a dynamic **React** frontend.
+**Velrith API v2** is a robust, full-stack API service designed for high performance and scalability. It combines a powerful **Node.js/Express** backend with a dynamic **React** frontend.
 
 **Key Features:**
 *   🚀 **High Speed**: Optimized for fast response times.

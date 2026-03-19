@@ -42,7 +42,7 @@ export default function Login() {
                         <Shield className="text-purple-500" size={32} />
                     </div>
                     <h2 className="text-3xl font-bold mb-2 text-black">Welcome Back</h2>
-                    <p className="text-purple-200">Sign in to Easir API Control Center</p>
+                    <p className="text-purple-200">Sign in to Velrith API Control Center</p>
                 </div>
 
                 {error && <div className="bg-red-500/10 text-red-500 p-3 rounded-lg text-sm mb-6">{error}</div>}
@@ -93,7 +93,7 @@ export default function Login() {
                 </form>
 
                 <p className="mt-8 text-center text-xs text-slate-300">
-                    &copy; 2026 Easir API. Secure Infrastructure.
+                    &copy; 2026 Velrith API. Secure Infrastructure.
                 </p>
             </motion.div>
         </div>

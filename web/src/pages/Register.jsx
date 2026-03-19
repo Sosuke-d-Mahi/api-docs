@@ -87,7 +87,7 @@ export default function Register() {
                         <Shield className="text-purple-500" size={32} />
                     </div>
                     <h1 className="text-3xl font-bold mb-2">Create Account</h1>
-                    <p className="text-slate-400">Join Easir API Infrastructure</p>
+                    <p className="text-slate-400">Join Velrith API Infrastructure</p>
                 </div>
 
                 <AnimatePresence mode="wait">
