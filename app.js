@@ -4,7 +4,6 @@ const path = require('path');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
-const si = require('systeminformation');
 const logger = require('./utils/logger');
 const apiKeyAuth = require('./middleware/apiKeyAuth');
 const ipGuard = require('./middleware/ipGuard');
@@ -12,9 +11,9 @@ const { apiSaver, createLogViewerRouter } = require('./middleware/api-saver');
 
 const connectDB = require('./utils/db');
 const settingsManager = require('./utils/settingsManager');
+const configLoader = require('./utils/configLoader');
 
-// MongoDB Connection
-const MONGO_URI = "mongodb+srv://Easirmahi:01200120mahi@anchestor.wmvrhcb.mongodb.net/easir-apis?retryWrites=true&w=majority&appName=Anchestor";
+const MONGO_URI = configLoader.getMongoUri();
 connectDB(MONGO_URI).then(() => {
     settingsManager.init();
 });
@@ -22,13 +21,17 @@ connectDB(MONGO_URI).then(() => {
 const app = express();
 const server = http.createServer(app);
 
-app.set("trust proxy", true); // IMPORTANT per user request
+app.set("trust proxy", true);
 app.enable("trust proxy");
 app.set("json spaces", 2);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cors());
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: false, limit: '2mb' }));
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Internal Settings Wrapper
 app.use((req, res, next) => {
@@ -56,11 +59,14 @@ app.use(apiSaver({
     identifyClient: (req) => req.headers["x-api-key"] || "anonymous"
 }));
 
-// Admin Logs Viewer
 app.use("/admin/system-logs", createLogViewerRouter({
     logDir: "./logs",
-    accessToken: "easir-secret-key-123" // Hardcoded matching legacy key for now
+    accessToken: configLoader.getLogViewerToken()
 }));
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
@@ -137,6 +143,16 @@ const io = new Server(server, {
 
 app.set('io', io);
 
+let si;
+const loadSi = async () => {
+    try {
+        si = require('systeminformation');
+    } catch (e) {
+        console.error('[Server] systeminformation not available:', e.message);
+    }
+};
+loadSi();
+
 io.on('connection', (socket) => {
     logger.info('Client Connected: ' + socket.id);
 
@@ -148,14 +164,17 @@ io.on('connection', (socket) => {
     socket.emit('config', settingsManager.get());
 });
 
+const STATS_INTERVAL = configLoader.getStatsInterval();
+
 setInterval(async () => {
+    if (!si) return;
     try {
-        const cpu = await si.currentLoad();
+        const load = await si.currentLoad();
         const mem = await si.mem();
         const uptime = si.time().uptime;
 
         const stats = {
-            cpu: cpu.currentLoad.toFixed(2),
+            cpu: load.currentLoad.toFixed(2),
             ram: {
                 total: (mem.total / 1024 / 1024 / 1024).toFixed(2) + " GB",
                 used: (mem.active / 1024 / 1024 / 1024).toFixed(2) + " GB",
@@ -167,11 +186,12 @@ setInterval(async () => {
         io.emit('stats', stats);
     } catch (e) {
     }
-}, 1000);
+}, STATS_INTERVAL);
 
-const PORT = process.env.PORT || 6969;
+const PORT = configLoader.getServerPort();
 server.listen(PORT, () => {
     logger.system(`Server running on port ${PORT}`);
+    logger.system(`Health check: http://localhost:${PORT}/health`);
 });
 
 // Global Error Handler to prevent 520 Crashes

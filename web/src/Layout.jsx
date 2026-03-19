@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link, useLocation, Outlet } from 'react-router-dom';
-import { Home, Book, LayoutDashboard, Settings, Shield, Menu, X, User, LogOut, Activity } from 'lucide-react';
+import { Home, Book, LayoutDashboard, Settings, Shield, Menu, X, User, LogOut, Activity, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from './context/AuthContext';
 import RainBackground from './components/RainBackground';
@@ -54,6 +54,7 @@ export default function Layout({ children }) {
                 {user && user.role === 'admin' && (
                     <>
                         <SidebarItem to="/admin/traffic" icon={Activity} label="Live Traffic" active={p === '/admin/traffic'} onClick={() => setMobileMenuOpen(false)} />
+                        <SidebarItem to="/admin/users" icon={Users} label="User Management" active={p === '/admin/users'} onClick={() => setMobileMenuOpen(false)} />
                         <SidebarItem to="/admin/settings" icon={Settings} label="Settings" active={p.includes('/admin/settings')} onClick={() => setMobileMenuOpen(false)} />
                     </>
                 )}

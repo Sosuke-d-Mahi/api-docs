@@ -1,0 +1,22 @@
+{
+  "mongoUri": "mongodb+srv://Easirmahi:01200120mahi@anchestor.wmvrhcb.mongodb.net/easir-apis?retryWrites=true&w=majority&appName=Anchestor",
+  "admin": {
+    "username": "mahi",
+    "password": "6244"
+  },
+  "email": {
+    "service": "gmail",
+    "host": "smtp.gmail.com",
+    "port": 465,
+    "secure": true
+  },
+  "server": {
+    "port": 6969,
+    "maxMemoryMB": 460,
+    "statsIntervalMs": 5000
+  },
+  "security": {
+    "logViewerToken": "easir-secret-key-123",
+    "apiRateLimit": 100
+  }
+}

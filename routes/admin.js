@@ -8,7 +8,11 @@ const logger = require('../utils/logger');
 const { getTraffic } = require('../middleware/trafficLogger');
 
 const settingsManager = require('../utils/settingsManager');
+const configLoader = require('../utils/configLoader');
+const User = require('../models/User');
+
 const bannedPath = path.join(__dirname, '../data/banned_ips.json');
+const usersFile = path.join(__dirname, '../data/users.json');
 
 router.get('/stats', adminAuth, async (req, res) => {
     try {
@@ -119,6 +123,175 @@ router.post('/unban-ip', adminAuth, (req, res) => {
         res.json({ status: true, message: `IP ${ip} unbanned.` });
     } catch (e) {
         res.status(500).json({ status: false, error: "Failed to unban IP" });
+    }
+});
+
+const getUsers = () => {
+    try {
+        if (!fs.existsSync(usersFile)) return [];
+        const content = fs.readFileSync(usersFile, 'utf-8');
+        if (!content || content.trim() === "") return [];
+        return JSON.parse(content);
+    } catch (e) {
+        return [];
+    }
+};
+
+const saveUsers = async (users) => {
+    fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
+    try {
+        for (const user of users) {
+            await User.findOneAndUpdate(
+                { email: user.email },
+                user,
+                { upsert: true, new: true }
+            );
+        }
+    } catch (err) {
+        console.error("[Admin] MongoDB Sync Error:", err.message);
+    }
+};
+
+router.get('/users', adminAuth, (req, res) => {
+    try {
+        const users = getUsers().map(u => ({
+            username: u.username,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            apikey: u.apikey,
+            banned: u.banned || false,
+            banReason: u.banReason || '',
+            credits: u.credits !== undefined ? u.credits : 1000,
+            creditLimit: u.creditLimit !== undefined ? u.creditLimit : -1,
+            createdAt: u.createdAt
+        }));
+        res.json({ status: true, data: users });
+    } catch (e) {
+        res.status(500).json({ status: false, error: "Failed to fetch users" });
+    }
+});
+
+router.post('/users/ban', adminAuth, async (req, res) => {
+    try {
+        const { username, reason } = req.body;
+        if (!username) return res.status(400).json({ status: false, error: "Username required" });
+
+        const users = getUsers();
+        const userIndex = users.findIndex(u => u.username === username);
+        
+        if (userIndex === -1) {
+            return res.status(404).json({ status: false, error: "User not found" });
+        }
+
+        const adminCreds = configLoader.getAdminCredentials();
+        if (users[userIndex].username === adminCreds.username) {
+            return res.status(403).json({ status: false, error: "Cannot ban admin user" });
+        }
+
+        users[userIndex].banned = true;
+        users[userIndex].banReason = reason || 'Banned by admin';
+        
+        await saveUsers(users);
+        logger.info(`[Admin] User ${username} banned. Reason: ${reason || 'None'}`);
+        
+        res.json({ status: true, message: `User ${username} has been banned.` });
+    } catch (e) {
+        res.status(500).json({ status: false, error: "Failed to ban user" });
+    }
+});
+
+router.post('/users/unban', adminAuth, async (req, res) => {
+    try {
+        const { username } = req.body;
+        if (!username) return res.status(400).json({ status: false, error: "Username required" });
+
+        const users = getUsers();
+        const userIndex = users.findIndex(u => u.username === username);
+        
+        if (userIndex === -1) {
+            return res.status(404).json({ status: false, error: "User not found" });
+        }
+
+        users[userIndex].banned = false;
+        users[userIndex].banReason = '';
+        
+        await saveUsers(users);
+        logger.info(`[Admin] User ${username} unbanned.`);
+        
+        res.json({ status: true, message: `User ${username} has been unbanned.` });
+    } catch (e) {
+        res.status(500).json({ status: false, error: "Failed to unban user" });
+    }
+});
+
+router.post('/users/delete', adminAuth, async (req, res) => {
+    try {
+        const { username } = req.body;
+        if (!username) return res.status(400).json({ status: false, error: "Username required" });
+
+        const adminCreds = configLoader.getAdminCredentials();
+        if (username === adminCreds.username) {
+            return res.status(403).json({ status: false, error: "Cannot delete admin user" });
+        }
+
+        const users = getUsers();
+        const userIndex = users.findIndex(u => u.username === username);
+        
+        if (userIndex === -1) {
+            return res.status(404).json({ status: false, error: "User not found" });
+        }
+
+        const deletedUser = users.splice(userIndex, 1)[0];
+        
+        await saveUsers(users);
+        
+        try {
+            await User.deleteOne({ email: deletedUser.email });
+        } catch (e) {
+            console.error("[Admin] MongoDB delete error:", e.message);
+        }
+        
+        logger.info(`[Admin] User ${username} deleted.`);
+        
+        res.json({ status: true, message: `User ${username} has been deleted.` });
+    } catch (e) {
+        res.status(500).json({ status: false, error: "Failed to delete user" });
+    }
+});
+
+router.post('/users/credits', adminAuth, async (req, res) => {
+    try {
+        const { username, credits, creditLimit } = req.body;
+        if (!username) return res.status(400).json({ status: false, error: "Username required" });
+
+        const users = getUsers();
+        const userIndex = users.findIndex(u => u.username === username);
+        
+        if (userIndex === -1) {
+            return res.status(404).json({ status: false, error: "User not found" });
+        }
+
+        if (credits !== undefined) {
+            users[userIndex].credits = parseInt(credits);
+        }
+        if (creditLimit !== undefined) {
+            users[userIndex].creditLimit = parseInt(creditLimit);
+        }
+        
+        await saveUsers(users);
+        logger.info(`[Admin] User ${username} credits updated. Credits: ${users[userIndex].credits}, Limit: ${users[userIndex].creditLimit}`);
+        
+        res.json({ 
+            status: true, 
+            message: `User ${username} credits updated.`,
+            data: {
+                credits: users[userIndex].credits,
+                creditLimit: users[userIndex].creditLimit
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ status: false, error: "Failed to update credits" });
     }
 });
 

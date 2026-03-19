@@ -7,9 +7,51 @@ const nodemailer = require('nodemailer');
 const User = require('../models/User');
 
 const usersFile = path.join(__dirname, '../data/users.json');
+const otpFile = path.join(__dirname, '../data/otp_store.json');
 const settingsManager = require('../utils/settingsManager');
+const configLoader = require('../utils/configLoader');
 
 const otpStore = new Map();
+
+const loadOtpFromFile = () => {
+    try {
+        if (fs.existsSync(otpFile)) {
+            const data = JSON.parse(fs.readFileSync(otpFile, 'utf-8'));
+            const now = Date.now();
+            for (const [email, otpData] of Object.entries(data)) {
+                if (otpData.expires > now) {
+                    otpStore.set(email, otpData);
+                }
+            }
+            console.log('[Auth] Loaded OTPs from file, count:', otpStore.size);
+        }
+    } catch (e) {
+        console.error('[Auth] Failed to load OTP file:', e.message);
+    }
+};
+
+const saveOtpToFile = () => {
+    try {
+        const obj = Object.fromEntries(otpStore);
+        fs.writeFileSync(otpFile, JSON.stringify(obj, null, 2));
+    } catch (e) {
+        console.error('[Auth] Failed to save OTP file:', e.message);
+    }
+};
+
+loadOtpFromFile();
+
+setInterval(() => {
+    const now = Date.now();
+    let changed = false;
+    for (const [email, data] of otpStore) {
+        if (data.expires < now) {
+            otpStore.delete(email);
+            changed = true;
+        }
+    }
+    if (changed) saveOtpToFile();
+}, 60000);
 
 const getSettings = () => {
     return settingsManager.get();
@@ -19,7 +61,6 @@ const getUsers = () => {
     try {
         if (!fs.existsSync(usersFile)) return [];
         const content = fs.readFileSync(usersFile, 'utf-8');
-        // Handle empty file case
         if (!content || content.trim() === "") return [];
         return JSON.parse(content);
     } catch (e) {
@@ -28,10 +69,7 @@ const getUsers = () => {
 };
 
 const saveUsers = async (users) => {
-    // 1. Save to JSON File
     fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
-
-    // 2. Sync to MongoDB (Fire and Forget)
     try {
         for (const user of users) {
             await User.findOneAndUpdate(
@@ -53,16 +91,37 @@ const generateApiKey = () => {
 
 const generateToken = () => 'easir-token-' + Math.random().toString(36).substr(2) + Date.now().toString(36);
 
-// --- AUTO SEED ADMIN ---
 const ensureAdminExists = async () => {
+    const adminCreds = configLoader.getAdminCredentials();
+    
     const adminUser = {
-        username: "mahi",
-        password: "6244",
-        name: "Mahi Admin",
-        email: "mahi@admin.local",
+        username: adminCreds.username,
+        password: adminCreds.password,
+        name: "Admin",
+        email: "admin@easir.local",
         role: "admin",
-        apikey: "god-mahi-manual-entry"
+        apikey: "god-admin-manual-entry",
+        credits: -1,
+        creditLimit: -1
     };
+
+    let users = getUsers();
+    const exists = users.find(u => u.username === adminUser.username);
+
+    if (!exists) {
+        console.log(`[Auth] Seeding Admin User '${adminUser.username}'...`);
+        users.push(adminUser);
+        await saveUsers(users);
+    } else {
+        try {
+            await User.findOneAndUpdate(
+                { email: adminUser.email },
+                adminUser,
+                { upsert: true, new: true }
+            );
+        } catch (e) { console.error("[Auth] Admin Mongo Sync Fail:", e.message); }
+    }
+};
 
     let users = getUsers();
     const exists = users.find(u => u.username === adminUser.username);
@@ -99,15 +158,12 @@ router.post('/send-otp', async (req, res) => {
         }
 
         const settings = getSettings();
-        // Safe check for settings existence
         if (!settings || !settings.credentials || !settings.credentials.gmailAccount) {
-            console.error("Critical: Email settings missing.");
+            console.error("[Email] Critical: Email settings missing.");
             return res.status(500).json({ status: false, message: "Server Email Config Missing" });
         }
 
         const creds = settings.credentials.gmailAccount;
-
-        // Debug Log for Missing Creds
         const missingKeys = [];
         if (!creds.email) missingKeys.push("email");
         if (!creds.clientId) missingKeys.push("clientId");
@@ -115,36 +171,8 @@ router.post('/send-otp', async (req, res) => {
         if (!creds.refreshToken) missingKeys.push("refreshToken");
 
         if (missingKeys.length > 0) {
-            console.error("CRITICAL: Missing Email Credentials: " + missingKeys.join(", "));
+            console.error("[Email] CRITICAL: Missing Email Credentials: " + missingKeys.join(", "));
             return res.status(500).json({ status: false, message: "Server Email Config Incomplete: " + missingKeys.join(", ") });
-        }
-
-        let transporter;
-        try {
-            // Using explicit settings to avoid timeouts on Render
-            transporter = nodemailer.createTransport({
-                host: 'smtp.gmail.com',
-                port: 587,
-                secure: false, // use STARTTLS
-                requireTLS: true,
-                auth: {
-                    type: 'OAuth2',
-                    user: creds.email,
-                    clientId: creds.clientId,
-                    clientSecret: creds.clientSecret,
-                    refreshToken: creds.refreshToken
-                },
-                tls: {
-                    rejectUnauthorized: false // Helps with some self-signed cert issues if they arise, though Gmail is usually fine.
-                },
-                logger: true,
-                debug: true,
-                connectionTimeout: 10000, // 10s connection timeout
-                socketTimeout: 10000      // 10s socket timeout
-            });
-        } catch (err) {
-            console.error("Transporter Creation Error:", err);
-            return res.status(500).json({ status: false, message: "Email Service Unavailable" });
         }
 
         const users = getUsers();
@@ -152,7 +180,6 @@ router.post('/send-otp', async (req, res) => {
             return res.json({ status: false, message: "Username already taken." });
         }
 
-        // Normalize email for check
         const normalizedEmail = email.toLowerCase();
 
         if (users.find(u => u.email.toLowerCase() === normalizedEmail)) {
@@ -168,12 +195,36 @@ router.post('/send-otp', async (req, res) => {
             name: name || username,
             expires: Date.now() + 5 * 60 * 1000
         });
+        saveOtpToFile();
 
-        console.log(`[Auth] User ${username} requested OTP for ${normalizedEmail}. Code generated. Sending email...`);
+        console.log(`[Auth] User ${username} requested OTP for ${normalizedEmail}. Code: ${code}`);
 
-        // Send Email with Timeout Protection
+        let transporter;
+        try {
+            transporter = nodemailer.createTransport({
+                host: 'smtp.gmail.com',
+                port: 465,
+                secure: true,
+                auth: {
+                    type: 'OAuth2',
+                    user: creds.email,
+                    clientId: creds.clientId,
+                    clientSecret: creds.clientSecret,
+                    refreshToken: creds.refreshToken
+                },
+                pool: true,
+                maxConnections: 1,
+                connectionTimeout: 15000,
+                greetingTimeout: 15000,
+                socketTimeout: 15000
+            });
+        } catch (err) {
+            console.error("[Email] Transporter Creation Error:", err.message);
+            return res.status(500).json({ status: false, message: "Email Service Configuration Error" });
+        }
+
         const mailOptions = {
-            from: "Easir API <noreply@easiriqbal.com>",
+            from: `"Easir API" <${creds.email}>`,
             to: normalizedEmail,
             subject: "Your Verification Code - Easir API",
             html: `
@@ -186,18 +237,26 @@ router.post('/send-otp', async (req, res) => {
             `
         };
 
-        const sendMailPromise = transporter.sendMail(mailOptions);
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Email Send Timeout (15s)")), 15000));
+        try {
+            await transporter.sendMail(mailOptions);
+            console.log(`[Email] Sent successfully to ${normalizedEmail}`);
+        } catch (emailError) {
+            console.error("[Email] Send Error:", emailError.message);
+            if (emailError.message.includes('Invalid credentials')) {
+                return res.status(500).json({ status: false, message: "Email service authentication failed. Please contact admin." });
+            }
+            if (emailError.message.includes('Too many')) {
+                return res.status(500).json({ status: false, message: "Too many requests. Please try again later." });
+            }
+            return res.status(500).json({ status: false, message: "Failed to send email: " + emailError.message });
+        }
 
-        await Promise.race([sendMailPromise, timeoutPromise]);
-
-        console.log(`[Auth] Email sent successfully to ${normalizedEmail}`);
-
+        transporter.close();
         res.json({ status: true, message: "Verification code sent to " + normalizedEmail });
 
     } catch (error) {
-        console.error("Deep Logic Error in /send-otp:", error);
-        res.status(500).json({ status: false, message: "Internal Server Error: " + error.message });
+        console.error("[Auth] /send-otp Error:", error);
+        res.status(500).json({ status: false, message: "Internal Server Error" });
     }
 });
 
@@ -217,6 +276,7 @@ router.post('/register', (req, res) => {
 
     if (Date.now() > pending.expires) {
         otpStore.delete(normalizedEmail);
+        saveOtpToFile();
         return res.json({ status: false, message: "Code expired. Please try again." });
     }
 
@@ -226,12 +286,10 @@ router.post('/register', (req, res) => {
 
     const users = getUsers();
 
-    // Double check just in case
     if (users.find(u => u.username.toLowerCase() === pending.username.toLowerCase())) {
         return res.json({ status: false, message: "Username already taken." });
     }
 
-    // Admin Check
     const isAdmin = normalizedEmail === 'easiriqbalmahi@gmail.com';
 
     const newUser = {
@@ -239,14 +297,18 @@ router.post('/register', (req, res) => {
         password: pending.password,
         name: pending.name,
         email: normalizedEmail,
-        role: isAdmin ? "admin" : "user", // Auto-grant admin
-        apikey: generateApiKey()
+        role: isAdmin ? "admin" : "user",
+        apikey: generateApiKey(),
+        banned: false,
+        credits: 1000,
+        creditLimit: -1
     };
 
     users.push(newUser);
     saveUsers(users);
 
     otpStore.delete(normalizedEmail);
+    saveOtpToFile();
 
     res.json({
         status: true,
@@ -258,7 +320,6 @@ router.post('/register', (req, res) => {
 router.post('/login', (req, res) => {
     const { username, password } = req.body;
 
-    // Case insensitive matching
     const normalizedInput = username.toLowerCase();
 
     const users = getUsers();
@@ -268,6 +329,12 @@ router.post('/login', (req, res) => {
     );
 
     if (user) {
+        if (user.banned) {
+            return res.status(403).json({
+                status: false,
+                message: "Account suspended. Reason: " + (user.banReason || "Contact admin")
+            });
+        }
         return res.json({
             status: true,
             message: "Login Successful",
@@ -276,7 +343,9 @@ router.post('/login', (req, res) => {
                 username: user.username,
                 role: user.role,
                 name: user.name,
-                apikey: user.apikey
+                apikey: user.apikey,
+                credits: user.credits,
+                creditLimit: user.creditLimit
             }
         });
     }

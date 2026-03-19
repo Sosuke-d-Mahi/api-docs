@@ -8,6 +8,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/admin/Dashboard';
 import Settings from './pages/admin/Settings';
 import Traffic from './pages/admin/Traffic';
+import Users from './pages/admin/Users';
 import Profile from './pages/Profile';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -66,6 +67,14 @@ export default function App() {
                 element={
                   <RequireAuth>
                     <Settings />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <RequireAuth>
+                    <Users />
                   </RequireAuth>
                 }
               />

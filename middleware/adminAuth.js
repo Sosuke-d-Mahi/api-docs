@@ -1,4 +1,5 @@
 const settingsManager = require('../utils/settingsManager');
+const configLoader = require('../utils/configLoader');
 
 const fs = require('fs');
 const path = require('path');
@@ -14,31 +15,27 @@ const getUsers = () => {
 };
 
 const adminAuth = (req, res, next) => {
-    // 1. Check for Master Key (Legacy/System)
     const authHeader = req.headers['x-admin-key'];
     const settings = settingsManager.get();
-    const adminKey = (settings.apiSettings && settings.apiSettings.adminKey) || "easir-secret-key-123";
+    const adminKey = (settings.apiSettings && settings.apiSettings.adminKey) || configLoader.getLogViewerToken();
 
     if (authHeader === adminKey) {
         return next();
     }
 
-    // 2. Check for User API Key (Query or Header)
     const apiKey = req.query.apikey || req.headers['x-api-key'] || req.headers['authorization'];
 
     if (apiKey) {
         const users = getUsers();
-        // Handle "Bearer " prefix if present
-        const cleanKey = apiKey.replace('Bearer ', '');
+        const cleanKey = (apiKey.replace('Bearer ', '')).trim();
         const user = users.find(u => u.apikey === cleanKey);
 
         if (user && user.role === 'admin') {
-            req.user = user; // Attach user to request
+            req.user = user;
             return next();
         }
     }
 
-    // 3. Fallback: Fail
     res.status(403).json({ status: false, message: "Admin Access Required" });
 };
 
