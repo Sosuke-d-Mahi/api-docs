@@ -14,9 +14,14 @@ const settingsManager = require('./utils/settingsManager');
 const configLoader = require('./utils/configLoader');
 
 const MONGO_URI = configLoader.getMongoUri();
-connectDB(MONGO_URI).then(() => {
+if (MONGO_URI) {
+    connectDB(MONGO_URI).then(() => {
+        settingsManager.init();
+    });
+} else {
+    console.log('[App] No MongoDB URI, starting without database');
     settingsManager.init();
-});
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -65,7 +70,12 @@ app.use("/admin/system-logs", createLogViewerRouter({
 }));
 
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    const settings = settingsManager.get();
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        emailConfigured: !!(settings?.credentials?.gmailAccount?.email)
+    });
 });
 
 app.use('/api/auth', require('./routes/auth'));

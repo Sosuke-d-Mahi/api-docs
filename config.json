@@ -4,12 +4,6 @@
     "username": "mahi",
     "password": "6244"
   },
-  "email": {
-    "service": "gmail",
-    "host": "smtp.gmail.com",
-    "port": 465,
-    "secure": true
-  },
   "server": {
     "port": 6969,
     "maxMemoryMB": 460,

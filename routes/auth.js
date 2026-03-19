@@ -128,21 +128,21 @@ ensureAdminExists().catch((error) => {
     console.error("[Auth] Failed to ensure admin exists:", error.message);
 });
 
-const sendEmail = async (transporter, mailOptions, retries = 3) => {
+const sendEmailWithRetry = async (transporter, mailOptions, retries = 3, delay = 2000) => {
+    let lastError;
     for (let i = 0; i < retries; i++) {
         try {
-            const result = await transporter.sendMail(mailOptions);
-            return { success: true, result };
+            const info = await transporter.sendMail(mailOptions);
+            return { success: true, info };
         } catch (error) {
-            console.log(`[Email] Attempt ${i + 1} failed: ${error.message}`);
+            lastError = error;
+            console.log(`[Email] Attempt ${i + 1}/${retries} failed: ${error.message}`);
             if (i < retries - 1) {
-                await new Promise(r => setTimeout(r, 3000));
-            } else {
-                return { success: false, error };
+                await new Promise(r => setTimeout(r, delay));
             }
         }
     }
-    return { success: false, error: new Error('All retries failed') };
+    return { success: false, error: lastError };
 };
 
 router.post('/send-otp', async (req, res) => {
@@ -158,14 +158,12 @@ router.post('/send-otp', async (req, res) => {
         }
 
         const settings = getSettings();
-        if (!settings || !settings.credentials || !settings.credentials.gmailAccount) {
-            console.error("[Email] Critical: Email settings missing.");
+        if (!settings?.credentials?.gmailAccount) {
             return res.status(500).json({ status: false, message: "Server Email Config Missing" });
         }
 
         const creds = settings.credentials.gmailAccount;
         if (!creds.email || !creds.clientId || !creds.clientSecret || !creds.refreshToken) {
-            console.error("[Email] Missing OAuth2 credentials");
             return res.status(500).json({ status: false, message: "Email service not configured" });
         }
 
@@ -203,12 +201,13 @@ router.post('/send-otp', async (req, res) => {
             }
         });
 
-        try {
-            await transporter.verify();
-            console.log('[Email] Transporter verified and ready');
-        } catch (verifyError) {
-            console.error('[Email] Transporter verify failed:', verifyError.message);
-        }
+        transporter.on('token', (token) => {
+            console.log('[Email] New access token:', token.accessToken);
+        });
+
+        transporter.on('error', (err) => {
+            console.error('[Email] Transporter error:', err.message);
+        });
 
         const mailOptions = {
             from: `"Easir API" <${creds.email}>`,
@@ -224,19 +223,29 @@ router.post('/send-otp', async (req, res) => {
             `
         };
 
-        const emailResult = await sendEmail(transporter, mailOptions, 3);
-
-        if (emailResult.success) {
+        const result = await sendEmailWithRetry(transporter, mailOptions, 3, 2000);
+        
+        if (result.success) {
             console.log(`[Email] Sent to ${normalizedEmail}`);
             return res.json({ status: true, message: "Verification code sent to " + normalizedEmail });
         }
 
-        console.error("[Email] Failed:", emailResult.error.message);
-        return res.status(500).json({ status: false, message: "Failed to send email. Please try again." });
+        const errMsg = result.error?.message || 'Unknown error';
+        const errCode = result.error?.code || 'N/A';
+        console.error(`[Email] Failed: ${errMsg} (code: ${errCode})`);
+        
+        if (errMsg.includes('Invalid')) {
+            return res.status(500).json({ status: false, message: "Email authentication failed. Please contact admin." });
+        }
+        if (errMsg.includes('Timeout')) {
+            return res.status(500).json({ status: false, message: "Email connection timeout. Please try again." });
+        }
+        
+        return res.status(500).json({ status: false, message: "Failed to send email: " + errMsg });
 
     } catch (error) {
-        console.error("[Auth] /send-otp Error:", error);
-        res.status(500).json({ status: false, message: "Internal Server Error" });
+        console.error("[Email] Error:", error);
+        return res.status(500).json({ status: false, message: "Internal Server Error: " + error.message });
     }
 });
 
