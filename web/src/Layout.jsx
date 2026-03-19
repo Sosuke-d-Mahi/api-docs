@@ -34,7 +34,7 @@ export default function Layout({ children }) {
         <>
             <div className="px-6 py-5 border-b border-slate-800 flex justify-between items-center bg-[var(--bg-sidebar)]">
                 <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                    <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-xs">E</div>
+                    <img src="/Shanks_icon-icons.com_76123.png" alt="Logo" className="w-7 h-7 rounded-sm shadow-lg shadow-blue-500/20" />
                     Easir API
                 </h1>
                 <button className="md:hidden text-slate-400" onClick={() => setMobileMenuOpen(false)}>
@@ -98,7 +98,7 @@ export default function Layout({ children }) {
             {/* Mobile Header */}
             <div className="md:hidden fixed top-0 w-full bg-[var(--bg-sidebar)] border-b border-slate-800 z-40 px-4 py-3 flex justify-between items-center">
                 <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                    <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-xs">E</div>
+                    <img src="/Shanks_icon-icons.com_76123.png" alt="Logo" className="w-7 h-7 rounded-sm shadow-lg shadow-blue-500/20" />
                     Easir API
                 </h1>
                 <button onClick={() => setMobileMenuOpen(true)}>

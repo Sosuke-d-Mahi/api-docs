@@ -2,9 +2,15 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
-const nodemailer = require('nodemailer');
 
 const User = require('../models/User');
+const {
+    getEmailErrorCode,
+    getEmailErrorMessage,
+    isEmailAuthError,
+    isEmailTimeoutError,
+    sendEmail
+} = require('../utils/emailSender');
 
 const usersFile = path.join(__dirname, '../data/users.json');
 const otpFile = path.join(__dirname, '../data/otp_store.json');
@@ -114,8 +120,9 @@ const ensureAdminExists = async () => {
         await saveUsers(users);
     } else {
         try {
+            // Find by username instead of email to avoid E11000 when emails differ
             await User.findOneAndUpdate(
-                { email: adminUser.email },
+                { username: adminUser.username },
                 adminUser,
                 { upsert: true, new: true }
             );
@@ -128,21 +135,20 @@ ensureAdminExists().catch((error) => {
     console.error("[Auth] Failed to ensure admin exists:", error.message);
 });
 
-const sendEmailWithRetry = async (transporter, mailOptions, retries = 3, delay = 2000) => {
+const sendEmailWithRetry = async (sendOperation, retries = 3, delay = 2000) => {
     let lastError;
     for (let i = 0; i < retries; i++) {
         try {
-            const info = await transporter.sendMail(mailOptions);
-            return { success: true, info };
+            return await sendOperation();
         } catch (error) {
             lastError = error;
-            console.log(`[Email] Attempt ${i + 1}/${retries} failed: ${error.message}`);
+            console.log(`[Email] Attempt ${i + 1}/${retries} failed: ${getEmailErrorMessage(error)}`);
             if (i < retries - 1) {
                 await new Promise(r => setTimeout(r, delay));
             }
         }
     }
-    return { success: false, error: lastError };
+    throw lastError;
 };
 
 router.post('/send-otp', async (req, res) => {
@@ -190,25 +196,6 @@ router.post('/send-otp', async (req, res) => {
 
         console.log(`[Auth] OTP for ${username}: ${code}`);
 
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                type: 'OAuth2',
-                user: creds.email,
-                clientId: creds.clientId,
-                clientSecret: creds.clientSecret,
-                refreshToken: creds.refreshToken
-            }
-        });
-
-        transporter.on('token', (token) => {
-            console.log('[Email] New access token:', token.accessToken);
-        });
-
-        transporter.on('error', (err) => {
-            console.error('[Email] Transporter error:', err.message);
-        });
-
         const mailOptions = {
             from: `"Easir API" <${creds.email}>`,
             to: normalizedEmail,
@@ -223,29 +210,31 @@ router.post('/send-otp', async (req, res) => {
             `
         };
 
-        const result = await sendEmailWithRetry(transporter, mailOptions, 3, 2000);
-        
-        if (result.success) {
-            console.log(`[Email] Sent to ${normalizedEmail}`);
-            return res.json({ status: true, message: "Verification code sent to " + normalizedEmail });
-        }
+        const result = await sendEmailWithRetry(
+            () => sendEmail(creds, mailOptions),
+            3,
+            2000
+        );
 
-        const errMsg = result.error?.message || 'Unknown error';
-        const errCode = result.error?.code || 'N/A';
-        console.error(`[Email] Failed: ${errMsg} (code: ${errCode})`);
-        
-        if (errMsg.includes('Invalid')) {
-            return res.status(500).json({ status: false, message: "Email authentication failed. Please contact admin." });
-        }
-        if (errMsg.includes('Timeout')) {
-            return res.status(500).json({ status: false, message: "Email connection timeout. Please try again." });
-        }
-        
-        return res.status(500).json({ status: false, message: "Failed to send email: " + errMsg });
+        console.log(`[Email] Sent to ${normalizedEmail} via ${result.provider}`);
+        return res.json({ status: true, message: "Verification code sent to " + normalizedEmail });
 
     } catch (error) {
-        console.error("[Email] Error:", error);
-        return res.status(500).json({ status: false, message: "Internal Server Error: " + error.message });
+        const errMsg = getEmailErrorMessage(error);
+        const errCode = getEmailErrorCode(error);
+        console.error(`[Email] Failed: ${errMsg} (code: ${errCode})`);
+
+        if (isEmailAuthError(error)) {
+            return res.status(500).json({ status: false, message: "Email authentication failed. Please contact admin." });
+        }
+        if (isEmailTimeoutError(error)) {
+            return res.status(500).json({
+                status: false,
+                message: "Email connection timeout. SMTP is often blocked on Render free web services."
+            });
+        }
+
+        return res.status(500).json({ status: false, message: "Failed to send email: " + errMsg });
     }
 });
 
