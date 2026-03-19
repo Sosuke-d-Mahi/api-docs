@@ -128,6 +128,23 @@ ensureAdminExists().catch((error) => {
     console.error("[Auth] Failed to ensure admin exists:", error.message);
 });
 
+const sendEmail = async (transporter, mailOptions, retries = 3) => {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const result = await transporter.sendMail(mailOptions);
+            return { success: true, result };
+        } catch (error) {
+            console.log(`[Email] Attempt ${i + 1} failed: ${error.message}`);
+            if (i < retries - 1) {
+                await new Promise(r => setTimeout(r, 3000));
+            } else {
+                return { success: false, error };
+            }
+        }
+    }
+    return { success: false, error: new Error('All retries failed') };
+};
+
 router.post('/send-otp', async (req, res) => {
     try {
         const { username, email, name, password } = req.body;
@@ -147,15 +164,9 @@ router.post('/send-otp', async (req, res) => {
         }
 
         const creds = settings.credentials.gmailAccount;
-        const missingKeys = [];
-        if (!creds.email) missingKeys.push("email");
-        if (!creds.clientId) missingKeys.push("clientId");
-        if (!creds.clientSecret) missingKeys.push("clientSecret");
-        if (!creds.refreshToken) missingKeys.push("refreshToken");
-
-        if (missingKeys.length > 0) {
-            console.error("[Email] CRITICAL: Missing Email Credentials: " + missingKeys.join(", "));
-            return res.status(500).json({ status: false, message: "Server Email Config Incomplete: " + missingKeys.join(", ") });
+        if (!creds.email || !creds.clientId || !creds.clientSecret || !creds.refreshToken) {
+            console.error("[Email] Missing OAuth2 credentials");
+            return res.status(500).json({ status: false, message: "Email service not configured" });
         }
 
         const users = getUsers();
@@ -164,7 +175,6 @@ router.post('/send-otp', async (req, res) => {
         }
 
         const normalizedEmail = email.toLowerCase();
-
         if (users.find(u => u.email.toLowerCase() === normalizedEmail)) {
             return res.json({ status: false, message: "Email already registered." });
         }
@@ -180,30 +190,24 @@ router.post('/send-otp', async (req, res) => {
         });
         saveOtpToFile();
 
-        console.log(`[Auth] User ${username} requested OTP for ${normalizedEmail}. Code: ${code}`);
+        console.log(`[Auth] OTP for ${username}: ${code}`);
 
-        let transporter;
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                type: 'OAuth2',
+                user: creds.email,
+                clientId: creds.clientId,
+                clientSecret: creds.clientSecret,
+                refreshToken: creds.refreshToken
+            }
+        });
+
         try {
-            transporter = nodemailer.createTransport({
-                host: 'smtp.gmail.com',
-                port: 465,
-                secure: true,
-                auth: {
-                    type: 'OAuth2',
-                    user: creds.email,
-                    clientId: creds.clientId,
-                    clientSecret: creds.clientSecret,
-                    refreshToken: creds.refreshToken
-                },
-                pool: true,
-                maxConnections: 1,
-                connectionTimeout: 15000,
-                greetingTimeout: 15000,
-                socketTimeout: 15000
-            });
-        } catch (err) {
-            console.error("[Email] Transporter Creation Error:", err.message);
-            return res.status(500).json({ status: false, message: "Email Service Configuration Error" });
+            await transporter.verify();
+            console.log('[Email] Transporter verified and ready');
+        } catch (verifyError) {
+            console.error('[Email] Transporter verify failed:', verifyError.message);
         }
 
         const mailOptions = {
@@ -220,22 +224,15 @@ router.post('/send-otp', async (req, res) => {
             `
         };
 
-        try {
-            await transporter.sendMail(mailOptions);
-            console.log(`[Email] Sent successfully to ${normalizedEmail}`);
-        } catch (emailError) {
-            console.error("[Email] Send Error:", emailError.message);
-            if (emailError.message.includes('Invalid credentials')) {
-                return res.status(500).json({ status: false, message: "Email service authentication failed. Please contact admin." });
-            }
-            if (emailError.message.includes('Too many')) {
-                return res.status(500).json({ status: false, message: "Too many requests. Please try again later." });
-            }
-            return res.status(500).json({ status: false, message: "Failed to send email: " + emailError.message });
+        const emailResult = await sendEmail(transporter, mailOptions, 3);
+
+        if (emailResult.success) {
+            console.log(`[Email] Sent to ${normalizedEmail}`);
+            return res.json({ status: true, message: "Verification code sent to " + normalizedEmail });
         }
 
-        transporter.close();
-        res.json({ status: true, message: "Verification code sent to " + normalizedEmail });
+        console.error("[Email] Failed:", emailResult.error.message);
+        return res.status(500).json({ status: false, message: "Failed to send email. Please try again." });
 
     } catch (error) {
         console.error("[Auth] /send-otp Error:", error);
