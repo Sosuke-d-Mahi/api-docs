@@ -7,6 +7,7 @@ const User = require('../models/User');
 const {
     getEmailErrorCode,
     getEmailErrorMessage,
+    isEmailApiDisabledError,
     isEmailAuthError,
     isEmailTimeoutError,
     sendEmail
@@ -224,6 +225,12 @@ router.post('/send-otp', async (req, res) => {
         const errCode = getEmailErrorCode(error);
         console.error(`[Email] Failed: ${errMsg} (code: ${errCode})`);
 
+        if (isEmailApiDisabledError(error)) {
+            return res.status(500).json({
+                status: false,
+                message: "Gmail API is disabled for this Google Cloud project. Enable gmail.googleapis.com and try again."
+            });
+        }
         if (isEmailAuthError(error)) {
             return res.status(500).json({ status: false, message: "Email authentication failed. Please contact admin." });
         }

@@ -4,6 +4,29 @@ const nodemailer = require('nodemailer');
 const GMAIL_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GMAIL_SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
 
+const getCandidateErrors = (error) => {
+    const seen = new Set();
+    const candidates = [];
+
+    const push = (candidate) => {
+        if (!candidate || seen.has(candidate)) return;
+        seen.add(candidate);
+        candidates.push(candidate);
+    };
+
+    push(error?.primaryError);
+    push(error?.transportErrors?.gmailApi);
+    push(error?.secondaryError);
+    push(error?.transportErrors?.smtp);
+    push(error);
+
+    return candidates;
+};
+
+const getPrimaryEmailError = (error) => {
+    return getCandidateErrors(error)[0] || error;
+};
+
 const encodeBase64Url = (input) => {
     return Buffer.from(input, 'utf-8')
         .toString('base64')
@@ -36,34 +59,43 @@ const createTokenRequestBody = (creds) => {
 };
 
 const getEmailErrorMessage = (error) => {
-    if (!error) return 'Unknown error';
+    for (const candidate of getCandidateErrors(error)) {
+        const message =
+            candidate.response?.data?.error?.message ||
+            candidate.response?.data?.error_description ||
+            candidate.response?.data?.message ||
+            candidate.message;
 
-    return (
-        error.response?.data?.error?.message ||
-        error.response?.data?.error_description ||
-        error.response?.data?.message ||
-        error.message ||
-        'Unknown error'
-    );
+        if (message) {
+            return message;
+        }
+    }
+
+    return 'Unknown error';
 };
 
 const getEmailErrorCode = (error) => {
-    if (!error) return 'UNKNOWN';
+    for (const candidate of getCandidateErrors(error)) {
+        const code =
+            candidate.response?.data?.error?.status ||
+            candidate.response?.data?.error ||
+            candidate.code ||
+            candidate.response?.status;
 
-    return (
-        error.response?.data?.error?.status ||
-        error.response?.data?.error ||
-        error.code ||
-        error.response?.status ||
-        'UNKNOWN'
-    );
+        if (code) {
+            return code;
+        }
+    }
+
+    return 'UNKNOWN';
 };
 
 const isEmailTimeoutError = (error) => {
-    if (!error) return false;
+    const primaryError = getPrimaryEmailError(error);
+    if (!primaryError) return false;
 
-    const message = getEmailErrorMessage(error).toLowerCase();
-    const code = String(getEmailErrorCode(error)).toLowerCase();
+    const message = getEmailErrorMessage(primaryError).toLowerCase();
+    const code = String(getEmailErrorCode(primaryError)).toLowerCase();
 
     return (
         code === 'etimedout' ||
@@ -75,10 +107,11 @@ const isEmailTimeoutError = (error) => {
 };
 
 const isEmailAuthError = (error) => {
-    if (!error) return false;
+    const primaryError = getPrimaryEmailError(error);
+    if (!primaryError) return false;
 
-    const message = getEmailErrorMessage(error).toLowerCase();
-    const code = String(getEmailErrorCode(error)).toLowerCase();
+    const message = getEmailErrorMessage(primaryError).toLowerCase();
+    const code = String(getEmailErrorCode(primaryError)).toLowerCase();
 
     return (
         code === 'eauth' ||
@@ -88,6 +121,19 @@ const isEmailAuthError = (error) => {
         message.includes('invalid grant') ||
         message.includes('unauthorized') ||
         message.includes('insufficient permission')
+    );
+};
+
+const isEmailApiDisabledError = (error) => {
+    const primaryError = getPrimaryEmailError(error);
+    if (!primaryError) return false;
+
+    const message = getEmailErrorMessage(primaryError).toLowerCase();
+
+    return (
+        message.includes('gmail api has not been used') ||
+        message.includes('gmail.googleapis.com') && message.includes('disabled') ||
+        message.includes('access not configured')
     );
 };
 
@@ -162,6 +208,8 @@ const sendEmail = async (creds, mailOptions) => {
         const error = new Error(
             `Gmail API failed: ${getEmailErrorMessage(gmailApiError)}; SMTP failed: ${getEmailErrorMessage(smtpError)}`
         );
+        error.primaryError = gmailApiError || smtpError;
+        error.secondaryError = smtpError;
         error.code = getEmailErrorCode(smtpError) || getEmailErrorCode(gmailApiError);
         error.transportErrors = {
             gmailApi: gmailApiError,
@@ -172,8 +220,10 @@ const sendEmail = async (creds, mailOptions) => {
 };
 
 module.exports = {
+    getPrimaryEmailError,
     getEmailErrorCode,
     getEmailErrorMessage,
+    isEmailApiDisabledError,
     isEmailAuthError,
     isEmailTimeoutError,
     sendEmail
