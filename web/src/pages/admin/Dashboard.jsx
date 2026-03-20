@@ -31,6 +31,7 @@ const Card = ({ title, value, sub, icon: Icon, trend }) => (
 const UserDashboard = ({ user }) => {
     const [copied, setCopied] = useState(false);
     const [logs, setLogs] = useState([]);
+    const [currentCredits, setCurrentCredits] = useState(user.credits);
     const [reqCount, setReqCount] = useState(0);
     const [testing, setTesting] = useState(false);
     const logsEndRef = useRef(null);
@@ -63,8 +64,13 @@ const UserDashboard = ({ user }) => {
             const time = new Date(data.timestamp).toLocaleTimeString();
             const newLog = `[${time}] ${data.method} ${data.path} [${data.ip || 'Unknown'}] - ${data.status}`;
 
-            setLogs(prev => [...prev.slice(-19), newLog]);
+            setLogs(prev => [newLog, ...prev].slice(0, 50));
             setReqCount(prev => prev + 1);
+            
+            // Real-time credits update
+            if (data.newCredits !== undefined) {
+                setCurrentCredits(data.newCredits);
+            }
         });
 
         return () => socket.disconnect();
@@ -119,7 +125,7 @@ const UserDashboard = ({ user }) => {
 
                 <Card 
                     title="API Credits" 
-                    value={user.credits === -1 ? "∞" : user.credits} 
+                    value={currentCredits === -1 ? "∞" : currentCredits} 
                     sub={user.creditLimit === -1 ? "Unlimited Access" : `Limit: ${user.creditLimit}`} 
                     icon={Database} 
                 />
