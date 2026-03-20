@@ -85,9 +85,10 @@ const saveUsers = async (users) => {
 };
 
 const generateApiKey = () => {
-    const random = Math.random().toString(36).substring(2, 10);
+    const random1 = Math.random().toString(36).substring(2, 10);
+    const random2 = Math.random().toString(36).substring(2, 10);
     const timestamp = Date.now().toString(36).substring(4);
-    return `god-mahi-${random}-${timestamp}`;
+    return `velrith-${random1}-${random2}-${timestamp}`;
 };
 
 const generateToken = () => 'easir-token-' + Math.random().toString(36).substr(2) + Date.now().toString(36);
@@ -95,18 +96,34 @@ const generateToken = () => 'easir-token-' + Math.random().toString(36).substr(2
 const ensureAdminExists = async () => {
     const adminCreds = configLoader.getAdminCredentials();
     
+    // Default system admin key randomization
     const adminUser = {
         username: adminCreds.username,
         password: adminCreds.password,
         name: "Admin",
         email: "admin@easir.local",
         role: "admin",
-        apikey: "god-admin-manual-entry",
+        apikey: "velrith-admin-master-" + Math.random().toString(36).substring(2, 10),
         credits: -1,
         creditLimit: -1
     };
 
     let users = getUsers();
+    
+    // Sync all users from local file to MongoDB to ensure new prefixes are applied
+    console.log(`[Auth] Syncing ${users.length} users with MongoDB...`);
+    try {
+        for (const user of users) {
+            await User.findOneAndUpdate(
+                { email: user.email },
+                user,
+                { upsert: true, new: true }
+            );
+        }
+    } catch (e) {
+        console.error("[Auth] User Sync Fail:", e.message);
+    }
+
     const exists = users.find(u => u.username === adminUser.username);
 
     if (!exists) {
@@ -120,7 +137,9 @@ const ensureAdminExists = async () => {
                 adminUser,
                 { upsert: true, new: true }
             );
-        } catch (e) { console.error("[Auth] Admin Mongo Sync Fail:", e.message); }
+        } catch (e) { 
+            console.error("[Auth] Default Admin Mongo Sync Fail:", e.message); 
+        }
     }
 };
 

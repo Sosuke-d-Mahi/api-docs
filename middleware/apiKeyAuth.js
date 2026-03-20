@@ -26,7 +26,7 @@ const apiKeyAuth = (req, res, next) => {
     if (!apikey) {
         return res.status(401).json({
             status: false,
-            message: "API Key Required. Add ?apikey=god-mahi-..."
+            message: "API Key Required. Add ?apikey=velrith-..."
         });
     }
 
