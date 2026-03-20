@@ -3,17 +3,12 @@
 @tailwind utilities;
 
 :root {
-  /* Lovable / Lauda Dark Theme - Adapted for Transparency */
   --bg-dark: transparent;
-  /* Changed to transparent to show wallpaper */
   --bg-card: rgba(15, 23, 42, 0.6);
-  /* Semi-transparent */
   --bg-card-hover: rgba(30, 41, 59, 0.8);
   --bg-sidebar: rgba(15, 17, 23, 0.8);
-  /* Semi-transparent sidebar */
 
   --primary: #8b5cf6;
-  /* Revert to Purple/Pink vibe if requested, or keep Blue. User liked 'super design'. keeping blue for now but maybe more neon? Let's tick to solid colors but transparent bg */
   --primary-hover: #7c3aed;
 
   --accent-purple: #8b5cf6;
@@ -37,13 +32,7 @@ body {
   background-color: var(--bg-dark);
   overflow-x: hidden;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-  /* Subtle shadow for readability */
 }
-
-/* Reverted aggressive transparent text rules */
-
-
-/* Scrollbar Styling */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -61,8 +50,6 @@ body {
   background: var(--primary);
 }
 
-/* Component Styles */
-/* Component Styles */
 .glass-panel {
   background: var(--bg-card);
   backdrop-filter: var(--glass);
@@ -76,7 +63,6 @@ body {
   background: var(--primary);
   color: white !important;
   -webkit-text-stroke: 0 !important;
-  /* Remove stroke */
   border: none;
   padding: 0.625rem 1.25rem;
   border-radius: 0.5rem;
@@ -98,10 +84,6 @@ body {
 }
 
 .gradient-text {
-  /* Gradient text usually needs background-clip. 
-     If user wants TRANSPARENT text, we favor that. 
-     But if we want 'gradient outline', that's harder.
-     For now, we enforce the transparency rule globally as requested. */
   background: none;
   -webkit-text-fill-color: transparent;
 }

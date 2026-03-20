@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { Home, Book, LayoutDashboard, Settings, Shield, Menu, X, User, LogOut, Activity, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -23,10 +22,6 @@ export default function Layout({ children }) {
     const p = location.pathname;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const { user, logout } = useAuth();
-
-    // useEffect(() => {
-    //     // Frontend tracking removed in favor of Server-Side TrafficLogger to avoid CORS and Adblockers.
-    // }, []);
 
     if (p === '/login') return children;
 
@@ -95,7 +90,6 @@ export default function Layout({ children }) {
     return (
         <div className="flex min-h-screen text-[var(--text-main)] font-sans relative">
             <RainBackground />
-            {/* Mobile Header */}
             <div className="md:hidden fixed top-0 w-full bg-[var(--bg-sidebar)] border-b border-slate-800 z-40 px-4 py-3 flex justify-between items-center">
                 <h1 className="text-lg font-bold text-white flex items-center gap-2">
                     <img src="/Shanks_icon-icons.com_76123.png" alt="Logo" className="w-7 h-7 rounded-sm shadow-lg shadow-blue-500/20" />
@@ -106,12 +100,10 @@ export default function Layout({ children }) {
                 </button>
             </div>
 
-            {/* Desktop Sidebar */}
             <aside className="hidden md:flex w-64 flex-col fixed inset-y-0 border-r border-slate-800 bg-[var(--bg-sidebar)] z-50">
                 <SidebarContent />
             </aside>
 
-            {/* Mobile Sidebar Overlay */}
             <AnimatePresence>
                 {mobileMenuOpen && (
                     <>
@@ -135,7 +127,6 @@ export default function Layout({ children }) {
                 )}
             </AnimatePresence>
 
-            {/* Main Content */}
             <main className="flex-1 md:ml-64 p-6 pt-20 md:p-8 md:pt-8 w-full">
                 {children || <Outlet />}
             </main>

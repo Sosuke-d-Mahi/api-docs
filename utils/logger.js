@@ -7,7 +7,6 @@ const logger = {
     error: (msg) => console.log(chalk.red(' [ERROR] ') + chalk.white(msg)),
     system: (msg) => console.log(chalk.magenta(' [SYSTEM] ') + chalk.cyan(msg)),
 
-    // Easir Branding Log
     banner: () => {
         console.log(chalk.cyan('=================================================='));
         console.log(chalk.bold.cyan('             EASIR API SERVICE v2.0               '));

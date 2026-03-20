@@ -9,10 +9,8 @@ export default function Traffic() {
     const [loading, setLoading] = useState(true);
     const [banning, setBanning] = useState(null);
 
-    // Tab State: 'live' or 'history'
     const [activeTab, setActiveTab] = useState('live');
 
-    // Pagination State
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [limit, setLimit] = useState(20);
@@ -39,9 +37,8 @@ export default function Traffic() {
         }
     };
 
-    // Effect for Limit/Polling based on Tab
     useEffect(() => {
-        setTraffic([]); // Clear on switch
+        setTraffic([]);
         setPage(1);
 
         if (activeTab === 'live') {
@@ -50,12 +47,11 @@ export default function Traffic() {
             const interval = setInterval(() => fetchTraffic(1, 20), 2000);
             return () => clearInterval(interval);
         } else {
-            setLimit(50); // Show more in history
+            setLimit(50);
             fetchTraffic(1, 50);
         }
     }, [activeTab, user]);
 
-    // Handle Page Change (History Only)
     const handlePageChange = (newPage) => {
         if (newPage < 1 || newPage > totalPages) return;
         setPage(newPage);
@@ -87,7 +83,6 @@ export default function Traffic() {
                     </p>
                 </div>
 
-                {/* Tab Switcher */}
                 <div className="flex bg-slate-800/50 p-1 rounded-lg border border-slate-700">
                     <button
                         onClick={() => setActiveTab('live')}
@@ -219,7 +214,6 @@ export default function Traffic() {
                     </table>
                 </div>
 
-                {/* Pagination Controls (Only for History) */}
                 {activeTab === 'history' && totalPages > 1 && (
                     <div className="p-4 border-t border-white/5 flex justify-between items-center bg-slate-900/30">
                         <span className="text-sm text-slate-400">

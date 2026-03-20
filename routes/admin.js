@@ -84,7 +84,6 @@ router.get('/traffic', adminAuth, async (req, res) => {
             source: 'db'
         });
     } catch (e) {
-        // Fallback to local cache if DB fails
         res.json({ status: true, data: getTraffic(), source: 'local' });
     }
 });

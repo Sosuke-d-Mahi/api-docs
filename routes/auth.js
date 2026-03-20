@@ -115,7 +115,6 @@ const ensureAdminExists = async () => {
         await saveUsers(users);
     } else {
         try {
-            // Find by username instead of email to avoid E11000 when emails differ
             await User.findOneAndUpdate(
                 { username: adminUser.username },
                 adminUser,
@@ -125,7 +124,6 @@ const ensureAdminExists = async () => {
     }
 };
 
-// Run immediately
 ensureAdminExists().catch((error) => {
     console.error("[Auth] Failed to ensure admin exists:", error.message);
 });

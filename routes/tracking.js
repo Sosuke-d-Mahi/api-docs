@@ -7,7 +7,6 @@ router.post('/visit', async (req, res) => {
     try {
         const { ip, isp, country, city, lat, lon, userAgent, path } = req.body;
 
-        // Basic validation
         if (!ip) {
             return res.status(400).json({ status: false, message: "IP Required" });
         }

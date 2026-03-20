@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 
 const SettingsSchema = new mongoose.Schema({
-    // We use a flexible schema to match the JSON structure exactly
     name: String,
     version: String,
     description: String,
@@ -13,7 +12,7 @@ const SettingsSchema = new mongoose.Schema({
 }, {
     strict: false,
     timestamps: true,
-    collection: 'settings' // Explicit collection name
+    collection: 'settings'
 });
 
 module.exports = mongoose.model('Settings', SettingsSchema);

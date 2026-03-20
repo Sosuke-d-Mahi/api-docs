@@ -12,7 +12,7 @@ const TrafficMap = () => {
         const fetchTraffic = async () => {
             try {
                 const res = await axios.get('/api/admin/traffic', {
-                    headers: { 'x-admin-key': 'easir-secret-key-123' } // Using legacy key as fallback or user key if available
+                    headers: { 'x-admin-key': 'easir-secret-key-123' }
                 });
                 if (res.data.status) {
                     setVisits(res.data.data);
@@ -24,7 +24,7 @@ const TrafficMap = () => {
         };
 
         fetchTraffic();
-        const interval = setInterval(fetchTraffic, 5000); // Poll every 5s
+        const interval = setInterval(fetchTraffic, 5000);
         return () => clearInterval(interval);
     }, [user]);
 
@@ -37,7 +37,6 @@ const TrafficMap = () => {
             </div>
 
             <div className="grid md:grid-cols-3 gap-6 h-[400px]">
-                {/* Visit List */}
                 <div className="md:col-span-1 border-r border-slate-800 pr-4 overflow-y-auto custom-scrollbar">
                     {visits.map((visit, i) => (
                         <div
@@ -56,7 +55,6 @@ const TrafficMap = () => {
                     {visits.length === 0 && <p className="text-slate-500 text-center py-10">No recent visits</p>}
                 </div>
 
-                {/* Map View */}
                 <div className="md:col-span-2 flex flex-col items-center justify-center bg-slate-900 rounded-lg overflow-hidden relative">
                     {selectedVisit ? (
                         <iframe

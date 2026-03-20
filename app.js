@@ -43,7 +43,6 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Internal Settings Wrapper
 app.use((req, res, next) => {
     const originalJson = res.json;
     res.json = function (data) {
@@ -64,7 +63,7 @@ app.use((req, res, next) => {
 app.use(apiSaver({
     serviceName: "easir-api",
     logDir: "./logs",
-    ipMode: "raw", // User wants full info visible
+    ipMode: "raw",
     enableEnrichment: true,
     identifyClient: (req) => req.headers["x-api-key"] || "anonymous"
 }));
@@ -86,7 +85,6 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/tracking', require('./routes/tracking'));
 
-// DEBUGGING LOGS
 const webDistPath = path.join(__dirname, 'dist');
 logger.info('Checking Frontend Path: ' + webDistPath);
 
@@ -100,7 +98,6 @@ if (fs.existsSync(webDistPath)) {
     }
 } else {
     logger.error('Frontend directory NOT found at: ' + webDistPath);
-    // List parent to see what IS there
     const webPath = path.join(__dirname, 'web');
     if (fs.existsSync(webPath)) {
         logger.info('Web directory exists. Contents: ' + fs.readdirSync(webPath).join(', '));
@@ -121,7 +118,6 @@ app.use('/', express.static(webDistPath, {
 }));
 
 app.use(ipGuard);
-// app.use(trafficLogger); // Replaced by apiSaver
 
 app.get('/api/docs', (req, res) => {
     try {
@@ -208,7 +204,6 @@ server.listen(PORT, () => {
     logger.system(`Health check: http://localhost:${PORT}/health`);
 });
 
-// Global Error Handler to prevent 520 Crashes
 app.use((err, req, res, next) => {
     logger.error("Unhandled Server Error: " + err.message);
     if (!res.headersSent) {
