@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Cpu, Database, Clock, Server, Activity, Key, Copy, Terminal, Play, Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Cpu, Database, Clock, Server, Activity, Key, Copy, Terminal, Play, Shield, Book } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const Card = ({ title, value, sub, icon: Icon, trend }) => (

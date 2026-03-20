@@ -17,11 +17,13 @@ const connectDB = require('./utils/db');
 const settingsManager = require('./utils/settingsManager');
 const configLoader = require('./utils/configLoader');
 const { isEmailConfigured } = require('./utils/emailSender');
+const { router: authRouter, ensureAdminExists } = require('./routes/auth');
 
 const MONGO_URI = configLoader.getMongoUri();
 if (MONGO_URI) {
-    connectDB(MONGO_URI).then(() => {
+    connectDB(MONGO_URI).then(async () => {
         settingsManager.init();
+        await ensureAdminExists();
     });
 } else {
     console.log('[App] No MongoDB URI, starting without database');
@@ -81,13 +83,12 @@ app.get('/health', (req, res) => {
     });
 });
 
-app.use('/api/auth', require('./routes/auth'));
+app.use('/api/auth', authRouter);
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/tracking', require('./routes/tracking'));
 
 const webDistPath = path.join(__dirname, 'dist');
 logger.info('Checking Frontend Path: ' + webDistPath);
-
 if (fs.existsSync(webDistPath)) {
     logger.info('Frontend directory exists at: ' + webDistPath);
     try {

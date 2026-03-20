@@ -94,6 +94,18 @@ const generateApiKey = () => {
 const generateToken = () => 'easir-token-' + Math.random().toString(36).substr(2) + Date.now().toString(36);
 
 const ensureAdminExists = async () => {
+    // 1. First, pull all users from MongoDB to local cache
+    console.log(`[Auth] Initializing user sync from MongoDB...`);
+    try {
+        const mongoUsers = await User.find({}).lean();
+        if (mongoUsers && mongoUsers.length > 0) {
+            console.log(`[Auth] Restoring ${mongoUsers.length} users from MongoDB...`);
+            fs.writeFileSync(usersFile, JSON.stringify(mongoUsers, null, 2));
+        }
+    } catch (e) {
+        console.error("[Auth] Initial Sync Fail:", e.message);
+    }
+
     const adminCreds = configLoader.getAdminCredentials();
     
     // Default system admin key randomization
@@ -110,8 +122,7 @@ const ensureAdminExists = async () => {
 
     let users = getUsers();
     
-    // Sync all users from local file to MongoDB to ensure new prefixes are applied
-    console.log(`[Auth] Syncing ${users.length} users with MongoDB...`);
+    // Sync all users from local file back to MongoDB (redundant check)
     try {
         for (const user of users) {
             await User.findOneAndUpdate(
@@ -121,7 +132,7 @@ const ensureAdminExists = async () => {
             );
         }
     } catch (e) {
-        console.error("[Auth] User Sync Fail:", e.message);
+        console.error("[Auth] User Reverse-Sync Fail:", e.message);
     }
 
     const exists = users.find(u => u.username === adminUser.username);
@@ -342,4 +353,4 @@ router.post('/login', (req, res) => {
     });
 });
 
-module.exports = router;
+module.exports = { router, ensureAdminExists };
