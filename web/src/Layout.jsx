@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from './context/AuthContext';
 import RainBackground from './components/RainBackground';
 
-
 const SidebarItem = ({ to, icon: Icon, label, active, onClick }) => (
     <Link to={to} style={{ textDecoration: 'none' }} onClick={onClick}>
         <div
@@ -42,12 +41,13 @@ export default function Layout({ children }) {
                 <SidebarItem to="/" icon={Home} label="Overview" active={p === '/'} onClick={() => setMobileMenuOpen(false)} />
                 <SidebarItem to="/docs" icon={Book} label="Documentation" active={p === '/docs'} onClick={() => setMobileMenuOpen(false)} />
 
-                <p className="text-xs font-semibold text-slate-500 uppercase mt-6 mb-3 px-3 tracking-wider">Admin</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase mt-6 mb-3 px-3 tracking-wider">Account</p>
                 <SidebarItem to="/admin/dashboard" icon={LayoutDashboard} label="Dashboard" active={p.includes('/admin/dashboard')} onClick={() => setMobileMenuOpen(false)} />
                 <SidebarItem to="/profile" icon={User} label="Profile" active={p === '/profile'} onClick={() => setMobileMenuOpen(false)} />
 
                 {user && user.role === 'admin' && (
                     <>
+                        <p className="text-xs font-semibold text-slate-500 uppercase mt-6 mb-3 px-3 tracking-wider">Admin</p>
                         <SidebarItem to="/admin/traffic" icon={Activity} label="Live Traffic" active={p === '/admin/traffic'} onClick={() => setMobileMenuOpen(false)} />
                         <SidebarItem to="/admin/users" icon={Users} label="User Management" active={p === '/admin/users'} onClick={() => setMobileMenuOpen(false)} />
                         <SidebarItem to="/admin/settings" icon={Settings} label="Settings" active={p.includes('/admin/settings')} onClick={() => setMobileMenuOpen(false)} />
@@ -62,7 +62,7 @@ export default function Layout({ children }) {
                         onClick={logout}
                     >
                         <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-medium text-xs">
-                            {user.name.charAt(0)}
+                            {user.name?.charAt(0) || '?'}
                         </div>
                         <div className="overflow-hidden flex-1">
                             <p className="text-sm font-medium text-slate-200 truncate">{user.name}</p>
