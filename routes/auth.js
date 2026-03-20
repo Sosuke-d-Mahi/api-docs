@@ -7,15 +7,13 @@ const User = require('../models/User');
 const {
     getEmailErrorCode,
     getEmailErrorMessage,
-    isEmailApiDisabledError,
-    isEmailAuthError,
+    isEmailConfigured,
     isEmailTimeoutError,
     sendEmail
 } = require('../utils/emailSender');
 
 const usersFile = path.join(__dirname, '../data/users.json');
 const otpFile = path.join(__dirname, '../data/otp_store.json');
-const settingsManager = require('../utils/settingsManager');
 const configLoader = require('../utils/configLoader');
 
 const otpStore = new Map();
@@ -59,10 +57,6 @@ setInterval(() => {
     }
     if (changed) saveOtpToFile();
 }, 60000);
-
-const getSettings = () => {
-    return settingsManager.get();
-};
 
 const getUsers = () => {
     try {
@@ -164,13 +158,7 @@ router.post('/send-otp', async (req, res) => {
             return res.json({ status: false, message: "Only @gmail.com addresses are allowed." });
         }
 
-        const settings = getSettings();
-        if (!settings?.credentials?.gmailAccount) {
-            return res.status(500).json({ status: false, message: "Server Email Config Missing" });
-        }
-
-        const creds = settings.credentials.gmailAccount;
-        if (!creds.email || !creds.clientId || !creds.clientSecret || !creds.refreshToken) {
+        if (!isEmailConfigured()) {
             return res.status(500).json({ status: false, message: "Email service not configured" });
         }
 
@@ -198,9 +186,9 @@ router.post('/send-otp', async (req, res) => {
         console.log(`[Auth] OTP for ${username}: ${code}`);
 
         const mailOptions = {
-            from: `"Easir API" <${creds.email}>`,
             to: normalizedEmail,
             subject: "Your Verification Code - Easir API",
+            text: `Your Easir API verification code is ${code}. This code expires in 5 minutes.`,
             html: `
                 <div style="font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; border-radius: 10px;">
                     <h2 style="color: #6d28d9;">Welcome to Easir API</h2>
@@ -212,7 +200,7 @@ router.post('/send-otp', async (req, res) => {
         };
 
         const result = await sendEmailWithRetry(
-            () => sendEmail(creds, mailOptions),
+            () => sendEmail(mailOptions),
             3,
             2000
         );
@@ -225,19 +213,10 @@ router.post('/send-otp', async (req, res) => {
         const errCode = getEmailErrorCode(error);
         console.error(`[Email] Failed: ${errMsg} (code: ${errCode})`);
 
-        if (isEmailApiDisabledError(error)) {
-            return res.status(500).json({
-                status: false,
-                message: "Gmail API is disabled for this Google Cloud project. Enable gmail.googleapis.com and try again."
-            });
-        }
-        if (isEmailAuthError(error)) {
-            return res.status(500).json({ status: false, message: "Email authentication failed. Please contact admin." });
-        }
         if (isEmailTimeoutError(error)) {
             return res.status(500).json({
                 status: false,
-                message: "Email connection timeout. SMTP is often blocked on Render free web services."
+                message: "External email API timed out. Please try again."
             });
         }
 

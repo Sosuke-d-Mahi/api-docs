@@ -14,13 +14,7 @@ services:
         value: 10000
       - key: MONGO_URI
         sync: false
-      - key: GMAIL_EMAIL
-        sync: false
-      - key: GMAIL_CLIENT_ID
-        sync: false
-      - key: GMAIL_CLIENT_SECRET
-        sync: false
-      - key: GMAIL_REFRESH_TOKEN
+      - key: MAIL_API_URL
         sync: false
       - key: ADMIN_USERNAME
         sync: false

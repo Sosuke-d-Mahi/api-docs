@@ -16,6 +16,7 @@ const { apiSaver, createLogViewerRouter } = require('./middleware/api-saver');
 const connectDB = require('./utils/db');
 const settingsManager = require('./utils/settingsManager');
 const configLoader = require('./utils/configLoader');
+const { isEmailConfigured } = require('./utils/emailSender');
 
 const MONGO_URI = configLoader.getMongoUri();
 if (MONGO_URI) {
@@ -74,11 +75,10 @@ app.use("/admin/system-logs", createLogViewerRouter({
 }));
 
 app.get('/health', (req, res) => {
-    const settings = settingsManager.get();
     res.json({ 
         status: 'ok', 
         timestamp: new Date().toISOString(),
-        emailConfigured: !!(settings?.credentials?.gmailAccount?.email)
+        emailConfigured: isEmailConfigured()
     });
 });
 
