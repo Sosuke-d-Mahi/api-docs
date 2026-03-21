@@ -8,6 +8,7 @@ const usersFile = path.join(__dirname, '../data/users.json');
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 const normalizeUsername = (value) => String(value || '').trim().toLowerCase();
+const numberOr = (value, fallback) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
 
 const buildIdentityQuery = ({ username, email }) => {
     const normalizedUsername = normalizeUsername(username);
@@ -47,18 +48,20 @@ const generateApiKey = (prefix = 'velrith') => {
 
 const sanitizeUser = (user) => {
     const source = typeof user.toObject === 'function' ? user.toObject() : user;
+    const fallbackUsername = String(source.username || source.email || 'unknown').trim();
+    const fallbackEmail = String(source.email || '').trim().toLowerCase();
     return {
         id: String(source._id),
-        username: source.username,
-        name: source.name,
-        email: source.email,
-        role: source.role,
+        username: fallbackUsername,
+        name: String(source.name || fallbackUsername || 'Unknown User').trim(),
+        email: fallbackEmail,
+        role: source.role || 'user',
         apikey: source.apikey,
         banned: source.banned || false,
         banReason: source.banReason || '',
-        credits: source.credits,
-        creditLimit: source.creditLimit,
-        createdAt: source.createdAt,
+        credits: numberOr(source.credits, 1000),
+        creditLimit: numberOr(source.creditLimit, -1),
+        createdAt: source.createdAt || null,
         lastLoginAt: source.lastLoginAt || null
     };
 };

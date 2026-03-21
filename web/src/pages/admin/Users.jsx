@@ -2,8 +2,20 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { getSessionHeaders } from '../../utils/authHeaders';
-import { Users as UsersIcon, Shield, Ban, Trash2, CreditCard, Search, AlertTriangle, Check, X, RefreshCw } from 'lucide-react';
+import { Shield, Ban, Trash2, CreditCard, Search, AlertTriangle, Check, X, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const safeText = (value, fallback = '') => String(value ?? fallback);
+
+const safeNumber = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const formatNumber = (value, fallback = '0') => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed.toLocaleString() : fallback;
+};
 
 export default function Users() {
     const { user } = useAuth();
@@ -26,11 +38,11 @@ export default function Users() {
         if (!user?.token) return;
         setLoading(true);
         axios.get('/api/admin/users', { headers: getSessionHeaders(user) })
-            .then(res => {
+            .then((res) => {
                 setUsers(res.data.data || []);
                 setLoading(false);
             })
-            .catch(err => {
+            .catch((err) => {
                 console.error(err);
                 setLoading(false);
                 showToast('Failed to fetch users', 'error');
@@ -92,9 +104,9 @@ export default function Users() {
         setActionLoading(true);
         try {
             const data = {};
-            if (creditAmount !== '') data.credits = parseInt(creditAmount);
-            if (creditLimit !== '') data.creditLimit = parseInt(creditLimit);
-            
+            if (creditAmount !== '') data.credits = parseInt(creditAmount, 10);
+            if (creditLimit !== '') data.creditLimit = parseInt(creditLimit, 10);
+
             await axios.post('/api/admin/users/credits', { username, ...data }, { headers: getSessionHeaders(user) });
             showToast(`Credits updated for ${username}`);
             setCreditAmount('');
@@ -107,10 +119,10 @@ export default function Users() {
         }
     };
 
-    const filteredUsers = users.filter(u => 
-        u.username.toLowerCase().includes(search.toLowerCase()) ||
-        u.email.toLowerCase().includes(search.toLowerCase()) ||
-        u.name.toLowerCase().includes(search.toLowerCase())
+    const filteredUsers = users.filter((entry) =>
+        safeText(entry.username).toLowerCase().includes(search.toLowerCase()) ||
+        safeText(entry.email).toLowerCase().includes(search.toLowerCase()) ||
+        safeText(entry.name).toLowerCase().includes(search.toLowerCase())
     );
 
     if (!user || user.role !== 'admin') {
@@ -177,91 +189,96 @@ export default function Users() {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredUsers.map((u) => (
-                                    <tr key={u.username} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                                        <td className="p-4">
-                                            <div>
-                                                <p className="font-medium text-white">{u.name}</p>
-                                                <p className="text-xs text-slate-500">@{u.username}</p>
-                                                <p className="text-xs text-slate-600">{u.email}</p>
-                                            </div>
-                                        </td>
-                                        <td className="p-4">
-                                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${u.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-500/20 text-slate-400'}`}>
-                                                {u.role === 'admin' && <Shield size={12} />}
-                                                {u.role}
-                                            </span>
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="text-sm">
-                                                <span className="text-white">{u.credits.toLocaleString()}</span>
-                                                {u.creditLimit > 0 && (
-                                                    <span className="text-slate-500"> / {u.creditLimit.toLocaleString()}</span>
-                                                )}
-                                                {u.creditLimit === -1 && (
-                                                    <span className="text-emerald-500 ml-1">∞</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-4">
-                                            {u.banned ? (
-                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">
-                                                    <Ban size={12} /> Banned
+                                filteredUsers.map((entry) => {
+                                    const credits = safeNumber(entry.credits, 1000);
+                                    const limit = safeNumber(entry.creditLimit, -1);
+
+                                    return (
+                                        <tr key={entry.id || entry.username} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                            <td className="p-4">
+                                                <div>
+                                                    <p className="font-medium text-white">{safeText(entry.name, 'Unknown User')}</p>
+                                                    <p className="text-xs text-slate-500">@{safeText(entry.username, 'unknown')}</p>
+                                                    <p className="text-xs text-slate-600">{safeText(entry.email, 'No email')}</p>
+                                                </div>
+                                            </td>
+                                            <td className="p-4">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${entry.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-500/20 text-slate-400'}`}>
+                                                    {entry.role === 'admin' && <Shield size={12} />}
+                                                    {safeText(entry.role, 'user')}
                                                 </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400">
-                                                    <Check size={12} /> Active
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedUser(u);
-                                                        setCreditAmount(u.credits.toString());
-                                                        setCreditLimit(u.creditLimit.toString());
-                                                    }}
-                                                    className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
-                                                    title="Manage Credits"
-                                                >
-                                                    <CreditCard size={16} />
-                                                </button>
-                                                {u.banned ? (
-                                                    <button
-                                                        onClick={() => handleUnban(u.username)}
-                                                        disabled={actionLoading}
-                                                        className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors"
-                                                        title="Unban User"
-                                                    >
-                                                        <Check size={16} />
-                                                    </button>
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="text-sm">
+                                                    <span className="text-white">{formatNumber(credits, '1,000')}</span>
+                                                    {limit > 0 && (
+                                                        <span className="text-slate-500"> / {formatNumber(limit)}</span>
+                                                    )}
+                                                    {limit === -1 && (
+                                                        <span className="text-emerald-500 ml-1">Unlimited</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="p-4">
+                                                {entry.banned ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">
+                                                        <Ban size={12} /> Banned
+                                                    </span>
                                                 ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400">
+                                                        <Check size={12} /> Active
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={() => {
-                                                            setSelectedUser(u);
-                                                            setBanReason('');
+                                                            setSelectedUser(entry);
+                                                            setCreditAmount(String(credits));
+                                                            setCreditLimit(String(limit));
                                                         }}
-                                                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
-                                                        title="Ban User"
+                                                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
+                                                        title="Manage Credits"
                                                     >
-                                                        <Ban size={16} />
+                                                        <CreditCard size={16} />
                                                     </button>
-                                                )}
-                                                {u.role !== 'admin' && (
-                                                    <button
-                                                        onClick={() => handleDelete(u.username)}
-                                                        disabled={actionLoading}
-                                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
-                                                        title="Delete User"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                                    {entry.banned ? (
+                                                        <button
+                                                            onClick={() => handleUnban(entry.username)}
+                                                            disabled={actionLoading}
+                                                            className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors"
+                                                            title="Unban User"
+                                                        >
+                                                            <Check size={16} />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedUser(entry);
+                                                                setBanReason('');
+                                                            }}
+                                                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                                            title="Ban User"
+                                                        >
+                                                            <Ban size={16} />
+                                                        </button>
+                                                    )}
+                                                    {entry.role !== 'admin' && (
+                                                        <button
+                                                            onClick={() => handleDelete(entry.username)}
+                                                            disabled={actionLoading}
+                                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                                                            title="Delete User"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
@@ -292,8 +309,8 @@ export default function Users() {
                             </div>
 
                             <div className="mb-4 p-3 bg-black/20 rounded-lg">
-                                <p className="text-white font-medium">{selectedUser.name}</p>
-                                <p className="text-slate-500 text-sm">@{selectedUser.username}</p>
+                                <p className="text-white font-medium">{safeText(selectedUser.name, 'Unknown User')}</p>
+                                <p className="text-slate-500 text-sm">@{safeText(selectedUser.username, 'unknown')}</p>
                             </div>
 
                             <div className="space-y-4">
@@ -328,25 +345,23 @@ export default function Users() {
                                 </button>
 
                                 {!selectedUser.banned && selectedUser.role !== 'admin' && (
-                                    <>
-                                        <div className="border-t border-white/5 pt-4 mt-4">
-                                            <label className="block text-sm font-medium text-slate-300 mb-2">Ban Reason (optional)</label>
-                                            <input
-                                                type="text"
-                                                value={banReason}
-                                                onChange={(e) => setBanReason(e.target.value)}
-                                                placeholder="Reason for ban..."
-                                                className="w-full bg-black/30 border border-white/10 rounded px-4 py-2 focus:border-red-500 outline-none text-white mb-3"
-                                            />
-                                            <button
-                                                onClick={() => handleBan(selectedUser.username)}
-                                                disabled={actionLoading}
-                                                className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                            >
-                                                <Ban size={16} /> Ban User
-                                            </button>
-                                        </div>
-                                    </>
+                                    <div className="border-t border-white/5 pt-4 mt-4">
+                                        <label className="block text-sm font-medium text-slate-300 mb-2">Ban Reason (optional)</label>
+                                        <input
+                                            type="text"
+                                            value={banReason}
+                                            onChange={(e) => setBanReason(e.target.value)}
+                                            placeholder="Reason for ban..."
+                                            className="w-full bg-black/30 border border-white/10 rounded px-4 py-2 focus:border-red-500 outline-none text-white mb-3"
+                                        />
+                                        <button
+                                            onClick={() => handleBan(selectedUser.username)}
+                                            disabled={actionLoading}
+                                            className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            <Ban size={16} /> Ban User
+                                        </button>
+                                    </div>
                                 )}
 
                                 {selectedUser.role !== 'admin' && (
