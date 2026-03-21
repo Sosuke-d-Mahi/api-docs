@@ -18,7 +18,7 @@ const userSchema = new mongoose.Schema({
     tokenVersion: { type: Number, default: 0 }
 }, { timestamps: true });
 
-userSchema.pre('validate', function syncNormalizedFields(next) {
+userSchema.pre('validate', function syncNormalizedFields() {
     if (this.username) {
         this.username = String(this.username).trim();
         this.usernameLower = this.username.toLowerCase();
@@ -28,8 +28,6 @@ userSchema.pre('validate', function syncNormalizedFields(next) {
         this.email = String(this.email).trim().toLowerCase();
         this.emailLower = this.email;
     }
-
-    next();
 });
 
 module.exports = mongoose.model('User', userSchema);
