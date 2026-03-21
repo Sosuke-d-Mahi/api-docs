@@ -9,6 +9,36 @@ const usersFile = path.join(__dirname, '../data/users.json');
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 const normalizeUsername = (value) => String(value || '').trim().toLowerCase();
 
+const buildIdentityQuery = ({ username, email }) => {
+    const normalizedUsername = normalizeUsername(username);
+    const normalizedEmail = normalizeEmail(email);
+    const rawUsername = String(username || '').trim();
+    const rawEmail = String(email || '').trim();
+    const clauses = [];
+
+    if (normalizedUsername) {
+        clauses.push({ usernameLower: normalizedUsername });
+    }
+
+    if (normalizedEmail) {
+        clauses.push({ emailLower: normalizedEmail });
+    }
+
+    if (rawUsername) {
+        clauses.push({ username: rawUsername });
+    }
+
+    if (rawEmail) {
+        clauses.push({ email: rawEmail });
+    }
+
+    if (normalizedEmail && normalizedEmail !== rawEmail) {
+        clauses.push({ email: normalizedEmail });
+    }
+
+    return clauses.length > 0 ? { $or: clauses } : null;
+};
+
 const generateApiKey = (prefix = 'velrith') => {
     const left = crypto.randomBytes(8).toString('hex');
     const right = crypto.randomBytes(8).toString('hex');
@@ -53,6 +83,7 @@ const buildUserPayload = async (input = {}) => ({
 
 const findUserByLogin = async (identifier) => {
     const normalized = String(identifier || '').trim().toLowerCase();
+    const raw = String(identifier || '').trim();
     if (!normalized) {
         return null;
     }
@@ -60,7 +91,10 @@ const findUserByLogin = async (identifier) => {
     return User.findOne({
         $or: [
             { usernameLower: normalized },
-            { emailLower: normalized }
+            { emailLower: normalized },
+            { username: raw },
+            { email: raw },
+            { email: normalized }
         ]
     });
 };
@@ -96,14 +130,26 @@ const migrateLegacyUsersFromFile = async () => {
             continue;
         }
 
-        const exists = await User.findOne({
-            $or: [
-                { usernameLower },
-                { emailLower }
-            ]
-        }).select('_id');
+        const identityQuery = buildIdentityQuery({
+            username: rawUser.username,
+            email: rawUser.email
+        });
+
+        const exists = identityQuery
+            ? await User.findOne(identityQuery).select('_id username email usernameLower emailLower')
+            : null;
 
         if (exists) {
+            const update = {};
+            if (!exists.usernameLower && usernameLower) {
+                update.usernameLower = usernameLower;
+            }
+            if (!exists.emailLower && emailLower) {
+                update.emailLower = emailLower;
+            }
+            if (Object.keys(update).length > 0) {
+                await User.updateOne({ _id: exists._id }, { $set: update });
+            }
             continue;
         }
 
@@ -120,5 +166,6 @@ module.exports = {
     migrateLegacyUsersFromFile,
     normalizeEmail,
     normalizeUsername,
-    sanitizeUser
+    sanitizeUser,
+    buildIdentityQuery
 };

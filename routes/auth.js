@@ -17,6 +17,7 @@ const { getRequestIp } = require('../utils/requestIdentity');
 const { hitRateLimit } = require('../utils/rateLimitStore');
 const { createAuthToken } = require('../utils/tokenService');
 const {
+    buildIdentityQuery,
     generateApiKey,
     migrateLegacyUsersFromFile,
     normalizeEmail,
@@ -83,7 +84,9 @@ const ensureAdminExists = async () => {
     let adminUser = await User.findOne({
         $or: [
             { usernameLower: normalizeUsername(username) },
-            { emailLower: adminEmail }
+            { emailLower: adminEmail },
+            { username },
+            { email: adminEmail }
         ]
     });
 
@@ -186,12 +189,10 @@ router.post('/send-otp', async (req, res) => {
             return rejectRateLimit(res, emailLimiter, "Too many verification code requests for this email. Please try again later.");
         }
 
-        const existingUser = await User.findOne({
-            $or: [
-                { usernameLower: normalizedUsername },
-                { emailLower: normalizedEmail }
-            ]
-        }).select('_id');
+        const existingUser = await User.findOne(buildIdentityQuery({
+            username,
+            email: normalizedEmail
+        })).select('_id');
 
         if (existingUser) {
             return res.status(409).json({ status: false, message: "Username or email already registered." });
@@ -323,12 +324,10 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ status: false, message: "Invalid verification code." });
         }
 
-        const existingUser = await User.findOne({
-            $or: [
-                { usernameLower: normalizeUsername(pending.username) },
-                { emailLower: normalizedEmail }
-            ]
-        }).select('_id');
+        const existingUser = await User.findOne(buildIdentityQuery({
+            username: pending.username,
+            email: normalizedEmail
+        })).select('_id');
 
         if (existingUser) {
             await AuthChallenge.deleteOne({ _id: pending._id });
