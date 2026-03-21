@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import { getSessionHeaders } from '../../utils/authHeaders';
 import { Users as UsersIcon, Shield, Ban, Trash2, CreditCard, Search, AlertTriangle, Check, X, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -22,9 +23,9 @@ export default function Users() {
     };
 
     const fetchUsers = () => {
-        if (!user || !user.apikey) return;
+        if (!user?.token) return;
         setLoading(true);
-        axios.get('/api/admin/users', { headers: { 'Authorization': user.apikey } })
+        axios.get('/api/admin/users', { headers: getSessionHeaders(user) })
             .then(res => {
                 setUsers(res.data.data || []);
                 setLoading(false);
@@ -41,10 +42,10 @@ export default function Users() {
     }, [user]);
 
     const handleBan = async (username) => {
-        if (!user || !user.apikey) return;
+        if (!user?.token) return;
         setActionLoading(true);
         try {
-            await axios.post('/api/admin/users/ban', { username, reason: banReason }, { headers: { 'Authorization': user.apikey } });
+            await axios.post('/api/admin/users/ban', { username, reason: banReason }, { headers: getSessionHeaders(user) });
             showToast(`${username} has been banned`);
             setSelectedUser(null);
             setBanReason('');
@@ -57,10 +58,10 @@ export default function Users() {
     };
 
     const handleUnban = async (username) => {
-        if (!user || !user.apikey) return;
+        if (!user?.token) return;
         setActionLoading(true);
         try {
-            await axios.post('/api/admin/users/unban', { username }, { headers: { 'Authorization': user.apikey } });
+            await axios.post('/api/admin/users/unban', { username }, { headers: getSessionHeaders(user) });
             showToast(`${username} has been unbanned`);
             fetchUsers();
         } catch (err) {
@@ -71,11 +72,11 @@ export default function Users() {
     };
 
     const handleDelete = async (username) => {
-        if (!user || !user.apikey) return;
+        if (!user?.token) return;
         if (!confirm(`Are you sure you want to delete ${username}? This action cannot be undone.`)) return;
         setActionLoading(true);
         try {
-            await axios.post('/api/admin/users/delete', { username }, { headers: { 'Authorization': user.apikey } });
+            await axios.post('/api/admin/users/delete', { username }, { headers: getSessionHeaders(user) });
             showToast(`${username} has been deleted`);
             setSelectedUser(null);
             fetchUsers();
@@ -87,14 +88,14 @@ export default function Users() {
     };
 
     const handleUpdateCredits = async (username) => {
-        if (!user || !user.apikey) return;
+        if (!user?.token) return;
         setActionLoading(true);
         try {
             const data = {};
             if (creditAmount !== '') data.credits = parseInt(creditAmount);
             if (creditLimit !== '') data.creditLimit = parseInt(creditLimit);
             
-            await axios.post('/api/admin/users/credits', { username, ...data }, { headers: { 'Authorization': user.apikey } });
+            await axios.post('/api/admin/users/credits', { username, ...data }, { headers: getSessionHeaders(user) });
             showToast(`Credits updated for ${username}`);
             setCreditAmount('');
             setCreditLimit('');

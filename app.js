@@ -1,29 +1,35 @@
 const express = require('express');
 const dns = require('dns');
-if (dns.setDefaultResultOrder) {
-    dns.setDefaultResultOrder('ipv4first');
-}
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
+
 const logger = require('./utils/logger');
 const apiKeyAuth = require('./middleware/apiKeyAuth');
 const ipGuard = require('./middleware/ipGuard');
 const { apiSaver, createLogViewerRouter } = require('./middleware/api-saver');
-
 const connectDB = require('./utils/db');
 const settingsManager = require('./utils/settingsManager');
 const configLoader = require('./utils/configLoader');
 const { isEmailConfigured } = require('./utils/emailSender');
 const { router: authRouter, ensureAdminExists } = require('./routes/auth');
+const { extractApiKey } = require('./utils/requestIdentity');
+const { verifyAuthToken } = require('./utils/tokenService');
+const User = require('./models/User');
+
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
 
 const MONGO_URI = configLoader.getMongoUri();
 if (MONGO_URI) {
-    connectDB(MONGO_URI).then(async () => {
-        settingsManager.init();
-        await ensureAdminExists();
+    connectDB(MONGO_URI).then(async (connected) => {
+        await settingsManager.init();
+        if (connected) {
+            await ensureAdminExists();
+        }
     });
 } else {
     console.log('[App] No MongoDB URI, starting without database');
@@ -42,17 +48,17 @@ app.use(express.urlencoded({ extended: false, limit: '2mb' }));
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
 }));
 
 app.use((req, res, next) => {
     const originalJson = res.json;
-    res.json = function (data) {
+    res.json = function wrapJson(data) {
         if (data && typeof data === 'object') {
             const currentSettings = settingsManager.get();
             const responseData = {
                 status: data.status !== undefined ? data.status : true,
-                creator: (currentSettings.apiSettings && currentSettings.apiSettings.operator) ? currentSettings.apiSettings.operator : "Easir Iqbal Mahi",
+                creator: currentSettings.apiSettings?.operator || "Easir Iqbal Mahi",
                 ...data
             };
             return originalJson.call(this, responseData);
@@ -67,7 +73,7 @@ app.use(apiSaver({
     logDir: "./logs",
     ipMode: "raw",
     enableEnrichment: true,
-    identifyClient: (req) => req.headers["x-api-key"] || "anonymous"
+    identifyClient: (req) => extractApiKey(req) || "anonymous"
 }));
 
 app.use("/admin/system-logs", createLogViewerRouter({
@@ -76,8 +82,8 @@ app.use("/admin/system-logs", createLogViewerRouter({
 }));
 
 app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'ok', 
+    res.json({
+        status: 'ok',
         timestamp: new Date().toISOString(),
         emailConfigured: isEmailConfigured()
     });
@@ -109,8 +115,8 @@ if (fs.existsSync(webDistPath)) {
 }
 
 app.use('/', express.static(webDistPath, {
-    setHeaders: (res, path) => {
-        if (path.endsWith('.html')) {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
@@ -142,10 +148,10 @@ app.use((req, res) => {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
-        res.sendFile(indexPath);
-    } else {
-        res.status(404).send('Frontend Not Found');
+        return res.sendFile(indexPath);
     }
+
+    return res.status(404).send('Frontend Not Found');
 });
 
 const io = new Server(server, {
@@ -153,6 +159,24 @@ const io = new Server(server, {
 });
 
 app.set('io', io);
+
+io.use(async (socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+        return next();
+    }
+
+    try {
+        const payload = verifyAuthToken(token);
+        const user = await User.findById(payload.sub);
+        if (user && user.tokenVersion === payload.tokenVersion && !user.banned) {
+            socket.authUser = user;
+        }
+    } catch (error) {
+    }
+
+    return next();
+});
 
 let si;
 const loadSi = async () => {
@@ -168,8 +192,23 @@ io.on('connection', (socket) => {
     logger.info('Client Connected: ' + socket.id);
 
     socket.on('join_room', (room) => {
-        socket.join(room);
-        logger.info(`Socket ${socket.id} joined room ${room}`);
+        if (!socket.authUser || !room || socket.authUser.apikey !== room) {
+            socket.emit('room_error', { room });
+            return;
+        }
+
+        socket.join(`apikey:${room}`);
+        logger.info(`Socket ${socket.id} joined room apikey:${room}`);
+    });
+
+    socket.on('subscribe_admin_traffic', () => {
+        if (!socket.authUser || socket.authUser.role !== 'admin') {
+            socket.emit('admin_traffic_error');
+            return;
+        }
+
+        socket.join('admin:traffic');
+        logger.info(`Socket ${socket.id} subscribed to admin:traffic`);
     });
 
     socket.emit('config', settingsManager.get());
@@ -191,7 +230,7 @@ setInterval(async () => {
                 used: (mem.active / 1024 / 1024 / 1024).toFixed(2) + " GB",
                 percent: ((mem.active / mem.total) * 100).toFixed(2)
             },
-            uptime: uptime
+            uptime
         };
 
         io.emit('stats', stats);

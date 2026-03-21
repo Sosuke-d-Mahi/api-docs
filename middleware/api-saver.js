@@ -3,7 +3,9 @@ const path = require("path");
 const crypto = require("crypto");
 const https = require("https");
 const http = require("http");
+
 const Traffic = require('../models/Traffic');
+const { extractApiKey } = require('../utils/requestIdentity');
 
 function ensureDir(dir) {
     if (!fs.existsSync(dir)) {
@@ -35,23 +37,30 @@ function maskIPv6(ip) {
 function isIPv4(ip) {
     return /^\d{1,3}(\.\d{1,3}){3}$/.test(ip);
 }
+
 function isIPv6(ip) {
     return /^[0-9a-fA-F:]+$/.test(ip) && ip.includes(":");
 }
 
 function normalizeIp(ip) {
     if (!ip) return "";
-    ip = String(ip).trim();
+    let value = String(ip).trim();
 
-    if (ip.startsWith("::ffff:")) ip = ip.replace("::ffff:", "");
+    if (value.startsWith("::ffff:")) {
+        value = value.replace("::ffff:", "");
+    }
 
-    const v4WithPort = ip.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
-    if (v4WithPort) ip = v4WithPort[1];
+    const v4WithPort = value.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
+    if (v4WithPort) {
+        value = v4WithPort[1];
+    }
 
-    const v6Bracket = ip.match(/^\[([0-9a-fA-F:]+)\](:\d+)?$/);
-    if (v6Bracket) ip = v6Bracket[1];
+    const v6Bracket = value.match(/^\[([0-9a-fA-F:]+)\](?::\d+)?$/);
+    if (v6Bracket) {
+        value = v6Bracket[1];
+    }
 
-    return ip;
+    return value;
 }
 
 function getClientIp(req) {
@@ -79,12 +88,14 @@ function getJson(url) {
         const client = url.startsWith("https") ? https : http;
         client.get(url, (res) => {
             let data = "";
-            res.on("data", (chunk) => (data += chunk));
+            res.on("data", (chunk) => {
+                data += chunk;
+            });
             res.on("end", () => {
                 try {
                     const json = JSON.parse(data);
                     resolve({ status: res.statusCode, json });
-                } catch (e) {
+                } catch {
                     reject(new Error("Failed to parse JSON response"));
                 }
             });
@@ -100,9 +111,9 @@ function apiSaver(options = {}) {
         ipMode = "hash",
         ipHashSalt = process.env.IP_HASH_SALT || "change-this-salt",
         maxBodyBytes = 2048,
-        identifyClient = (req) => req.headers["x-api-key"] || req.headers["authorization"] || "anonymous",
+        identifyClient = (req) => extractApiKey(req) || "anonymous",
         enableEnrichment = true,
-        enrichmentCacheMinutes = 60,
+        enrichmentCacheMinutes = 60
     } = options;
 
     if (!["hash", "mask", "raw"].includes(ipMode)) {
@@ -112,25 +123,31 @@ function apiSaver(options = {}) {
     ensureDir(logDir);
 
     const filePath = path.join(logDir, `${logFilePrefix}-${serviceName}.jsonl`);
-
     const enrichCache = new Map();
     const cacheMs = enrichmentCacheMinutes * 60 * 1000;
 
     async function enrichIp(ip) {
-        if (!enableEnrichment) return null;
-        if (!ip) return null;
+        if (!enableEnrichment || !ip) {
+            return null;
+        }
 
-        if (ip === '127.0.0.1' || ip === 'localhost') return { city: 'Localhost', country: 'Local', isp: 'Local', lat: 0, lon: 0 };
+        if (ip === '127.0.0.1' || ip === 'localhost') {
+            return { city: 'Localhost', country: 'Local', isp: 'Local', lat: 0, lon: 0 };
+        }
 
         const cached = enrichCache.get(ip);
         const now = Date.now();
-        if (cached && now - cached.at < cacheMs) return cached.data;
+        if (cached && now - cached.at < cacheMs) {
+            return cached.data;
+        }
 
         const url = `http://ip-api.com/json/${ip}`;
 
         try {
             const { status, json } = await getJson(url);
-            if (json.status !== 'success') throw new Error(json.message || "API Error");
+            if (json.status !== 'success') {
+                throw new Error(json.message || "API Error");
+            }
 
             const data = {
                 provider: "ip-api.com",
@@ -178,7 +195,7 @@ function apiSaver(options = {}) {
     async function saveToMongo(logObj, rawIp) {
         try {
             if (logObj.ipInfo && !logObj.ipInfo.error) {
-                const update = {
+                const saved = await Traffic.create({
                     ip: rawIp,
                     isp: logObj.ipInfo.isp,
                     org: logObj.ipInfo.org,
@@ -193,29 +210,30 @@ function apiSaver(options = {}) {
                     path: logObj.path,
                     method: logObj.method,
                     timestamp: new Date()
-                };
-
-                await Traffic.create(update);
-            } else {
-                await Traffic.create({
-                    ip: rawIp,
-                    timestamp: new Date(),
-                    path: logObj.path,
-                    method: logObj.method,
-                    userAgent: logObj.ua,
-                    isp: 'Unknown',
-                    country: 'Unknown',
-                    city: 'Unknown'
                 });
+                return saved.toObject();
             }
+
+            const saved = await Traffic.create({
+                ip: rawIp,
+                timestamp: new Date(),
+                path: logObj.path,
+                method: logObj.method,
+                userAgent: logObj.ua,
+                isp: 'Unknown',
+                country: 'Unknown',
+                city: 'Unknown'
+            });
+            return saved.toObject();
         } catch (e) {
             console.error("Mongo Save Error:", e.message);
+            return null;
         }
     }
 
     return async function apiSaverMiddleware(req, res, next) {
-        const p = req.originalUrl || req.url;
-        if (p.includes('/api/admin/traffic') || p.includes('/api/stats') || p.includes('/socket.io')) {
+        const requestPath = req.originalUrl || req.url;
+        if (requestPath.includes('/api/admin/traffic') || requestPath.includes('/api/stats') || requestPath.includes('/socket.io')) {
             return next();
         }
 
@@ -228,24 +246,26 @@ function apiSaver(options = {}) {
 
         const ipStored = formatIp(ip);
 
-        let bodyPreview = undefined;
+        let bodyPreview;
         if (req.body !== undefined) {
             try {
                 const raw = typeof req.body === "string" ? req.body : JSON.stringify(req.body);
-                bodyPreview = raw.length > maxBodyBytes ? raw.slice(0, maxBodyBytes) + "…(truncated)" : raw;
+                bodyPreview = raw.length > maxBodyBytes ? raw.slice(0, maxBodyBytes) + "...(truncated)" : raw;
             } catch {
                 bodyPreview = "[unserializable body]";
             }
         }
 
         const clientId = (() => {
-            try { return String(identifyClient(req) || "anonymous"); }
-            catch { return "anonymous"; }
+            try {
+                return String(identifyClient(req) || "anonymous");
+            } catch {
+                return "anonymous";
+            }
         })();
 
         res.on("finish", async () => {
             const durationMs = Date.now() - start;
-
             const baseLog = {
                 ts: nowISO(),
                 service: serviceName,
@@ -256,7 +276,7 @@ function apiSaver(options = {}) {
                 clientId,
                 ip: ipStored,
                 ua: req.headers["user-agent"] || "",
-                referer: req.headers["referer"] || "",
+                referer: req.headers.referer || ""
             };
 
             if (req.method !== "GET" && bodyPreview !== undefined) {
@@ -269,7 +289,11 @@ function apiSaver(options = {}) {
 
             writeLog(baseLog);
 
-            await saveToMongo(baseLog, ip);
+            const savedTraffic = await saveToMongo(baseLog, ip);
+            const io = req.app.get('io');
+            if (io && savedTraffic) {
+                io.to('admin:traffic').emit('traffic:entry', savedTraffic);
+            }
         });
 
         next();
@@ -289,12 +313,12 @@ function createLogViewerRouter({ logDir = "./logs", accessToken = "" } = {}) {
         if (String(token || "") !== String(accessToken || "")) {
             return res.status(401).json({ ok: false, error: "unauthorized" });
         }
-        next();
+        return next();
     });
 
     router.get("/", (req, res) => {
         try {
-            const files = fs.readdirSync(logDir).filter((f) => f.endsWith(".jsonl"));
+            const files = fs.readdirSync(logDir).filter((file) => file.endsWith(".jsonl"));
             res.json({ ok: true, files });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
@@ -305,10 +329,14 @@ function createLogViewerRouter({ logDir = "./logs", accessToken = "" } = {}) {
         const file = String(req.query.file || "");
         const lines = Math.min(Math.max(parseInt(req.query.lines || "100", 10), 1), 2000);
 
-        if (!file.endsWith(".jsonl")) return res.status(400).json({ ok: false, error: "invalid file" });
+        if (!file.endsWith(".jsonl")) {
+            return res.status(400).json({ ok: false, error: "invalid file" });
+        }
 
         const fullPath = path.join(logDir, path.basename(file));
-        if (!fs.existsSync(fullPath)) return res.status(404).json({ ok: false, error: "not found" });
+        if (!fs.existsSync(fullPath)) {
+            return res.status(404).json({ ok: false, error: "not found" });
+        }
 
         try {
             const content = fs.readFileSync(fullPath, "utf8");

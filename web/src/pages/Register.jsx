@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { Shield, Key, User, ArrowRight, Mail, CheckCircle, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
 
 export default function Register() {
     const [step, setStep] = useState(1);
@@ -16,6 +17,7 @@ export default function Register() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { completeAuth } = useAuth();
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -59,7 +61,11 @@ export default function Register() {
             });
 
             if (res.data.status) {
-                alert(`Account Created! Your API Key: ${res.data.apikey}`);
+                if (res.data.token && res.data.user) {
+                    completeAuth({ token: res.data.token, user: res.data.user });
+                    navigate('/profile');
+                    return;
+                }
                 navigate('/login');
             } else {
                 setError(res.data.message);

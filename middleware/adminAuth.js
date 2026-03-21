@@ -1,42 +1,35 @@
-const settingsManager = require('../utils/settingsManager');
-const configLoader = require('../utils/configLoader');
+const User = require('../models/User');
+const { extractApiKey, extractBearerToken } = require('../utils/requestIdentity');
+const { verifyAuthToken } = require('../utils/tokenService');
+const { findUserByApiKey } = require('../utils/userStore');
 
-const fs = require('fs');
-const path = require('path');
-const usersFile = path.join(__dirname, '../data/users.json');
+const adminAuth = async (req, res, next) => {
+    const token = extractBearerToken(req);
 
-const getUsers = () => {
-    try {
-        if (!fs.existsSync(usersFile)) return [];
-        return JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
-    } catch (e) {
-        return [];
-    }
-};
+    if (token) {
+        try {
+            const payload = verifyAuthToken(token);
+            const user = await User.findById(payload.sub);
 
-const adminAuth = (req, res, next) => {
-    const authHeader = req.headers['x-admin-key'];
-    const settings = settingsManager.get();
-    const adminKey = (settings.apiSettings && settings.apiSettings.adminKey) || configLoader.getLogViewerToken();
-
-    if (authHeader === adminKey) {
-        return next();
+            if (user && user.tokenVersion === payload.tokenVersion && !user.banned && user.role === 'admin') {
+                req.user = user;
+                return next();
+            }
+        } catch (error) {
+            return res.status(401).json({ status: false, message: "Invalid or expired session" });
+        }
     }
 
-    const apiKey = req.query.apikey || req.headers['x-api-key'] || req.headers['authorization'];
-
+    const apiKey = extractApiKey(req);
     if (apiKey) {
-        const users = getUsers();
-        const cleanKey = (apiKey.replace('Bearer ', '')).trim();
-        const user = users.find(u => u.apikey === cleanKey);
-
-        if (user && user.role === 'admin') {
+        const user = await findUserByApiKey(apiKey);
+        if (user && !user.banned && user.role === 'admin') {
             req.user = user;
             return next();
         }
     }
 
-    res.status(403).json({ status: false, message: "Admin Access Required" });
+    return res.status(403).json({ status: false, message: "Admin Access Required" });
 };
 
 module.exports = adminAuth;

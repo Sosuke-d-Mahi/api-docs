@@ -1,9 +1,12 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import { Link } from 'react-router-dom';
 import { Cpu, Database, Clock, Server, Activity, Key, Copy, Terminal, Play, Shield, Book } from 'lucide-react';
+
 import { useAuth } from '../../context/AuthContext';
+import TrafficMap from './TrafficMap';
+import { getApiKeyHeaders } from '../../utils/authHeaders';
 
 const Card = ({ title, value, sub, icon: Icon, trend }) => (
     <div className="glass-panel p-5 flex flex-col justify-between h-full relative overflow-hidden group">
@@ -32,7 +35,6 @@ const UserDashboard = ({ user }) => {
     const [copied, setCopied] = useState(false);
     const [logs, setLogs] = useState([]);
     const [currentCredits, setCurrentCredits] = useState(user.credits);
-    const [reqCount, setReqCount] = useState(0);
     const [testing, setTesting] = useState(false);
     const logsEndRef = useRef(null);
 
@@ -45,18 +47,27 @@ const UserDashboard = ({ user }) => {
     const runTest = async () => {
         setTesting(true);
         try {
-            await axios.get(`/api/stats?apikey=${user.apikey}`);
+            await axios.get('/api/tiktok?search=music', {
+                headers: getApiKeyHeaders(user)
+            });
         } catch (e) {
             console.error(e);
+        } finally {
+            setTimeout(() => setTesting(false), 500);
         }
-        setTimeout(() => setTesting(false), 500);
     };
 
     useEffect(() => {
-        const socket = io('/', { path: '/socket.io' });
+        if (!user?.token || !user?.apikey) {
+            return undefined;
+        }
+
+        const socket = io('/', {
+            path: '/socket.io',
+            auth: { token: user.token }
+        });
 
         socket.on('connect', () => {
-            console.log("User Socket Connected");
             socket.emit('join_room', user.apikey);
         });
 
@@ -64,17 +75,14 @@ const UserDashboard = ({ user }) => {
             const time = new Date(data.timestamp).toLocaleTimeString();
             const newLog = `[${time}] ${data.method} ${data.path} [${data.ip || 'Unknown'}] - ${data.status}`;
 
-            setLogs(prev => [newLog, ...prev].slice(0, 50));
-            setReqCount(prev => prev + 1);
-            
-            // Real-time credits update
+            setLogs((prev) => [newLog, ...prev].slice(0, 50));
             if (data.newCredits !== undefined) {
                 setCurrentCredits(data.newCredits);
             }
         });
 
         return () => socket.disconnect();
-    }, [user.apikey]);
+    }, [user?.apikey, user?.token]);
 
     useEffect(() => {
         logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -123,25 +131,25 @@ const UserDashboard = ({ user }) => {
                     </div>
                 </div>
 
-                <Card 
-                    title="API Credits" 
-                    value={currentCredits === -1 ? "∞" : currentCredits} 
-                    sub={user.creditLimit === -1 ? "Unlimited Access" : `Limit: ${user.creditLimit}`} 
-                    icon={Database} 
-                />
-                
-                <Card 
-                    title="Service Plan" 
-                    value={user.role === 'admin' ? "Lifetime Admin" : "Free Tier"} 
-                    sub={user.role === 'admin' ? "All capabilities unlocked" : "1,000 requests per hour"} 
-                    icon={Shield} 
+                <Card
+                    title="API Credits"
+                    value={currentCredits === -1 ? "∞" : currentCredits}
+                    sub={user.creditLimit === -1 ? "Unlimited Access" : `Limit: ${user.creditLimit}`}
+                    icon={Database}
                 />
 
-                <Card 
-                    title="API Status" 
-                    value="Active" 
-                    sub="Latency: 24ms (Excellent)" 
-                    icon={Activity} 
+                <Card
+                    title="Service Plan"
+                    value={user.role === 'admin' ? "Lifetime Admin" : "Free Tier"}
+                    sub={user.role === 'admin' ? "All capabilities unlocked" : "1,000 requests per hour"}
+                    icon={Shield}
+                />
+
+                <Card
+                    title="API Status"
+                    value="Active"
+                    sub="Latency: 24ms (Excellent)"
+                    icon={Activity}
                 />
             </div>
 
@@ -162,25 +170,25 @@ const UserDashboard = ({ user }) => {
                         LISTENING ON PORT 6969
                     </div>
                 </div>
-                
+
                 <div className="flex-1 bg-[#090b10] p-6 font-mono text-[13px] overflow-y-auto custom-scrollbar relative">
                     <div className="absolute top-0 left-0 w-full h-full pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03]"></div>
-                    
+
                     {logs.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center text-slate-700 animate-pulse">
                             <Terminal size={48} className="mb-4 opacity-20" />
                             <p className="text-sm font-medium">Ready for transmission. Send a request to begin.</p>
                         </div>
                     )}
-                    
+
                     <div className="space-y-4">
-                        {logs.map((log, i) => {
+                        {logs.map((log, index) => {
                             const isError = log.includes(' - 4') || log.includes(' - 5');
                             const isSuccess = log.includes(' - 2');
-                            
+
                             return (
-                                <div key={i} className="flex gap-4 group">
-                                    <span className="text-slate-600 shrink-0">[{i+1}]</span>
+                                <div key={index} className="flex gap-4 group">
+                                    <span className="text-slate-600 shrink-0">[{index + 1}]</span>
                                     <div className={`flex-1 border-l-2 ${isError ? 'border-red-500/40 bg-red-500/5' : isSuccess ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-blue-500/40 bg-blue-500/5'} pl-4 py-2 rounded-r-lg transition-all group-hover:bg-white/5`}>
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isError ? 'bg-red-500/20 text-red-400' : isSuccess ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
@@ -203,17 +211,9 @@ const UserDashboard = ({ user }) => {
     );
 };
 
-import TrafficMap from './TrafficMap';
-
-export default function Dashboard() {
-    const { user } = useAuth();
+const AdminDashboard = () => {
     const [stats, setStats] = useState(null);
-    const [history, setHistory] = useState([]);
     const [status, setStatus] = useState('Connecting...');
-
-    if (user && user.role !== 'admin') {
-        return <UserDashboard user={user} />;
-    }
 
     useEffect(() => {
         const socket = io('/', { path: '/socket.io' });
@@ -233,24 +233,21 @@ export default function Dashboard() {
 
         socket.on('stats', (data) => {
             setStats(data);
-            setHistory(prev => {
-                const newHistory = [...prev, { name: '', cpu: parseFloat(data.cpu) }];
-                if (newHistory.length > 30) newHistory.shift();
-                return newHistory;
-            });
         });
 
         return () => socket.disconnect();
     }, []);
 
-    if (!stats) return (
-        <div className="flex flex-col items-center justify-center h-[60vh] text-slate-500">
-            <div className="relative w-12 h-12 mb-4">
-                <div className="absolute inset-0 rounded-full border-4 border-slate-700 border-t-blue-500 animate-spin"></div>
+    if (!stats) {
+        return (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-slate-500">
+                <div className="relative w-12 h-12 mb-4">
+                    <div className="absolute inset-0 rounded-full border-4 border-slate-700 border-t-blue-500 animate-spin"></div>
+                </div>
+                <p className="text-sm font-medium animate-pulse">{status}</p>
             </div>
-            <p className="text-sm font-medium animate-pulse">{status}</p>
-        </div>
-    );
+        );
+    }
 
     return (
         <div>
@@ -277,4 +274,14 @@ export default function Dashboard() {
             </div>
         </div>
     );
+};
+
+export default function Dashboard() {
+    const { user } = useAuth();
+
+    if (user && user.role !== 'admin') {
+        return <UserDashboard user={user} />;
+    }
+
+    return <AdminDashboard />;
 }

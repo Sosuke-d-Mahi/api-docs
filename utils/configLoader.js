@@ -41,6 +41,26 @@ const getLogViewerToken = () => {
     return process.env.LOG_VIEWER_TOKEN || config.security?.logViewerToken || 'easir-secret-key-123';
 };
 
+const getAuthTokenSecret = () => {
+    return process.env.AUTH_TOKEN_SECRET || config.security?.authTokenSecret || `${getLogViewerToken()}::${getAdminCredentials().password}`;
+};
+
+const getAuthTokenTtlSeconds = () => {
+    return parseInt(process.env.AUTH_TOKEN_TTL_SECONDS || config.security?.authTokenTtlSeconds || 604800, 10);
+};
+
+const getOtpSecret = () => {
+    return process.env.OTP_SECRET || config.security?.otpSecret || getAuthTokenSecret();
+};
+
+const getApiRateLimit = () => {
+    return parseInt(process.env.API_RATE_LIMIT || config.security?.apiRateLimit || 100, 10);
+};
+
+const getApiRateWindowMs = () => {
+    return parseInt(process.env.API_RATE_WINDOW_MS || config.security?.apiRateWindowMs || 60000, 10);
+};
+
 const getServerPort = () => {
     return parseInt(process.env.PORT || config.server?.port || 6969);
 };
@@ -58,9 +78,14 @@ loadConfig();
 module.exports = {
     get,
     loadConfig,
+    getApiRateLimit,
+    getApiRateWindowMs,
+    getAuthTokenSecret,
+    getAuthTokenTtlSeconds,
     getMongoUri,
     getAdminCredentials,
     getLogViewerToken,
+    getOtpSecret,
     getServerPort,
     getStatsInterval,
     getMaxMemory

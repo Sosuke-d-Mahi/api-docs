@@ -1,18 +1,83 @@
 const express = require('express');
-const router = express.Router();
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
 const si = require('systeminformation');
+
 const adminAuth = require('../middleware/adminAuth');
 const logger = require('../utils/logger');
-const { getTraffic } = require('../middleware/trafficLogger');
-
 const settingsManager = require('../utils/settingsManager');
 const configLoader = require('../utils/configLoader');
+const Traffic = require('../models/Traffic');
 const User = require('../models/User');
+const { normalizeUsername, sanitizeUser } = require('../utils/userStore');
 
+const router = express.Router();
 const bannedPath = path.join(__dirname, '../data/banned_ips.json');
-const usersFile = path.join(__dirname, '../data/users.json');
+
+const clamp = (value, min, max, fallback) => {
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) {
+        return fallback;
+    }
+    return Math.min(Math.max(parsed, min), max);
+};
+
+const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const encodeCursor = (entry) => Buffer.from(JSON.stringify({
+    timestamp: new Date(entry.timestamp).toISOString(),
+    id: String(entry._id)
+})).toString('base64url');
+
+const decodeCursor = (cursor) => {
+    if (!cursor) {
+        return null;
+    }
+
+    try {
+        const payload = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+        if (!payload.timestamp || !payload.id || !mongoose.Types.ObjectId.isValid(payload.id)) {
+            return null;
+        }
+        return payload;
+    } catch {
+        return null;
+    }
+};
+
+const resolveDateRange = ({ range, from, to }) => {
+    const now = Date.now();
+    const result = {};
+
+    if (range && range !== 'all') {
+        const windows = {
+            '24h': 24 * 60 * 60 * 1000,
+            '7d': 7 * 24 * 60 * 60 * 1000,
+            '30d': 30 * 24 * 60 * 60 * 1000
+        };
+
+        if (windows[range]) {
+            result.$gte = new Date(now - windows[range]);
+        }
+    }
+
+    if (from) {
+        const parsedFrom = new Date(from);
+        if (!Number.isNaN(parsedFrom.getTime())) {
+            result.$gte = parsedFrom;
+        }
+    }
+
+    if (to) {
+        const parsedTo = new Date(to);
+        if (!Number.isNaN(parsedTo.getTime())) {
+            result.$lte = parsedTo;
+        }
+    }
+
+    return Object.keys(result).length > 0 ? result : null;
+};
 
 router.get('/stats', adminAuth, async (req, res) => {
     try {
@@ -31,7 +96,7 @@ router.get('/stats', adminAuth, async (req, res) => {
                     percent: ((mem.active / mem.total) * 100).toFixed(2)
                 },
                 os: os.distro,
-                uptime: uptime
+                uptime
             }
         });
     } catch (e) {
@@ -59,32 +124,82 @@ router.post('/settings', adminAuth, async (req, res) => {
     }
 });
 
-const Traffic = require('../models/Traffic');
-
 router.get('/traffic', adminAuth, async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 20;
-        const page = parseInt(req.query.page) || 1;
-        const skip = (page - 1) * limit;
+        const limit = clamp(req.query.limit, 1, 100, 20);
+        const method = String(req.query.method || '').trim().toUpperCase();
+        const search = String(req.query.search || '').trim();
+        const dateRange = resolveDateRange({
+            range: req.query.range,
+            from: req.query.from,
+            to: req.query.to
+        });
+        const cursor = decodeCursor(req.query.cursor);
 
-        const total = await Traffic.countDocuments();
-        const visits = await Traffic.find()
-            .sort({ timestamp: -1 })
-            .skip(skip)
-            .limit(limit);
+        const baseFilters = [];
+
+        if (dateRange) {
+            baseFilters.push({ timestamp: dateRange });
+        }
+
+        if (method && method !== 'ALL') {
+            baseFilters.push({ method });
+        }
+
+        if (search) {
+            const regex = new RegExp(escapeRegExp(search), 'i');
+            baseFilters.push({
+                $or: [
+                    { ip: regex },
+                    { city: regex },
+                    { country: regex },
+                    { isp: regex },
+                    { path: regex }
+                ]
+            });
+        }
+
+        const filters = [...baseFilters];
+        if (cursor) {
+            const cursorDate = new Date(cursor.timestamp);
+            filters.push({
+                $or: [
+                    { timestamp: { $lt: cursorDate } },
+                    { timestamp: cursorDate, _id: { $lt: new mongoose.Types.ObjectId(cursor.id) } }
+                ]
+            });
+        }
+
+        const query = filters.length > 0 ? { $and: filters } : {};
+        const baseQuery = baseFilters.length > 0 ? { $and: baseFilters } : {};
+
+        const docs = await Traffic.find(query)
+            .sort({ timestamp: -1, _id: -1 })
+            .limit(limit + 1)
+            .lean();
+
+        const hasMore = docs.length > limit;
+        const data = hasMore ? docs.slice(0, limit) : docs;
+        const nextCursor = hasMore ? encodeCursor(data[data.length - 1]) : null;
+        const total = await Traffic.countDocuments(baseQuery);
 
         res.json({
             status: true,
-            data: visits,
+            data,
             pagination: {
-                total,
-                page,
-                pages: Math.ceil(total / limit)
+                limit,
+                nextCursor,
+                hasMore,
+                total
             },
-            source: 'db'
+            filters: {
+                range: req.query.range || 'all',
+                search,
+                method: method || 'ALL'
+            }
         });
     } catch (e) {
-        res.json({ status: true, data: getTraffic(), source: 'local' });
+        res.status(500).json({ status: false, error: "Failed to fetch traffic" });
     }
 });
 
@@ -100,7 +215,9 @@ router.get('/banned-ips', adminAuth, (req, res) => {
 router.post('/ban-ip', adminAuth, (req, res) => {
     try {
         const { ip } = req.body;
-        if (!ip) return res.status(400).json({ status: false, error: "IP required" });
+        if (!ip) {
+            return res.status(400).json({ status: false, error: "IP required" });
+        }
 
         const list = JSON.parse(fs.readFileSync(bannedPath, 'utf8'));
         if (!list.includes(ip)) {
@@ -117,7 +234,7 @@ router.post('/unban-ip', adminAuth, (req, res) => {
     try {
         const { ip } = req.body;
         const list = JSON.parse(fs.readFileSync(bannedPath, 'utf8'));
-        const newList = list.filter(i => i !== ip);
+        const newList = list.filter((item) => item !== ip);
         fs.writeFileSync(bannedPath, JSON.stringify(newList, null, 2));
         res.json({ status: true, message: `IP ${ip} unbanned.` });
     } catch (e) {
@@ -125,47 +242,16 @@ router.post('/unban-ip', adminAuth, (req, res) => {
     }
 });
 
-const getUsers = () => {
+router.get('/users', adminAuth, async (req, res) => {
     try {
-        if (!fs.existsSync(usersFile)) return [];
-        const content = fs.readFileSync(usersFile, 'utf-8');
-        if (!content || content.trim() === "") return [];
-        return JSON.parse(content);
-    } catch (e) {
-        return [];
-    }
-};
+        const users = await User.find()
+            .sort({ createdAt: -1 })
+            .lean();
 
-const saveUsers = async (users) => {
-    fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
-    try {
-        for (const user of users) {
-            await User.findOneAndUpdate(
-                { email: user.email },
-                user,
-                { upsert: true, new: true }
-            );
-        }
-    } catch (err) {
-        console.error("[Admin] MongoDB Sync Error:", err.message);
-    }
-};
-
-router.get('/users', adminAuth, (req, res) => {
-    try {
-        const users = getUsers().map(u => ({
-            username: u.username,
-            name: u.name,
-            email: u.email,
-            role: u.role,
-            apikey: u.apikey,
-            banned: u.banned || false,
-            banReason: u.banReason || '',
-            credits: u.credits !== undefined ? u.credits : 1000,
-            creditLimit: u.creditLimit !== undefined ? u.creditLimit : -1,
-            createdAt: u.createdAt
-        }));
-        res.json({ status: true, data: users });
+        res.json({
+            status: true,
+            data: users.map((user) => sanitizeUser(user))
+        });
     } catch (e) {
         res.status(500).json({ status: false, error: "Failed to fetch users" });
     }
@@ -174,27 +260,35 @@ router.get('/users', adminAuth, (req, res) => {
 router.post('/users/ban', adminAuth, async (req, res) => {
     try {
         const { username, reason } = req.body;
-        if (!username) return res.status(400).json({ status: false, error: "Username required" });
-
-        const users = getUsers();
-        const userIndex = users.findIndex(u => u.username === username);
-        
-        if (userIndex === -1) {
-            return res.status(404).json({ status: false, error: "User not found" });
+        if (!username) {
+            return res.status(400).json({ status: false, error: "Username required" });
         }
 
+        const normalized = normalizeUsername(username);
         const adminCreds = configLoader.getAdminCredentials();
-        if (users[userIndex].username === adminCreds.username) {
+
+        if (normalized === normalizeUsername(adminCreds.username)) {
             return res.status(403).json({ status: false, error: "Cannot ban admin user" });
         }
 
-        users[userIndex].banned = true;
-        users[userIndex].banReason = reason || 'Banned by admin';
-        
-        await saveUsers(users);
-        logger.info(`[Admin] User ${username} banned. Reason: ${reason || 'None'}`);
-        
-        res.json({ status: true, message: `User ${username} has been banned.` });
+        const user = await User.findOneAndUpdate(
+            { usernameLower: normalized },
+            {
+                $set: {
+                    banned: true,
+                    banReason: reason || 'Banned by admin'
+                },
+                $inc: { tokenVersion: 1 }
+            },
+            { new: true }
+        );
+
+        if (!user) {
+            return res.status(404).json({ status: false, error: "User not found" });
+        }
+
+        logger.info(`[Admin] User ${user.username} banned. Reason: ${reason || 'None'}`);
+        res.json({ status: true, message: `User ${user.username} has been banned.` });
     } catch (e) {
         res.status(500).json({ status: false, error: "Failed to ban user" });
     }
@@ -203,22 +297,28 @@ router.post('/users/ban', adminAuth, async (req, res) => {
 router.post('/users/unban', adminAuth, async (req, res) => {
     try {
         const { username } = req.body;
-        if (!username) return res.status(400).json({ status: false, error: "Username required" });
+        if (!username) {
+            return res.status(400).json({ status: false, error: "Username required" });
+        }
 
-        const users = getUsers();
-        const userIndex = users.findIndex(u => u.username === username);
-        
-        if (userIndex === -1) {
+        const user = await User.findOneAndUpdate(
+            { usernameLower: normalizeUsername(username) },
+            {
+                $set: {
+                    banned: false,
+                    banReason: ''
+                },
+                $inc: { tokenVersion: 1 }
+            },
+            { new: true }
+        );
+
+        if (!user) {
             return res.status(404).json({ status: false, error: "User not found" });
         }
 
-        users[userIndex].banned = false;
-        users[userIndex].banReason = '';
-        
-        await saveUsers(users);
-        logger.info(`[Admin] User ${username} unbanned.`);
-        
-        res.json({ status: true, message: `User ${username} has been unbanned.` });
+        logger.info(`[Admin] User ${user.username} unbanned.`);
+        res.json({ status: true, message: `User ${user.username} has been unbanned.` });
     } catch (e) {
         res.status(500).json({ status: false, error: "Failed to unban user" });
     }
@@ -227,33 +327,23 @@ router.post('/users/unban', adminAuth, async (req, res) => {
 router.post('/users/delete', adminAuth, async (req, res) => {
     try {
         const { username } = req.body;
-        if (!username) return res.status(400).json({ status: false, error: "Username required" });
+        if (!username) {
+            return res.status(400).json({ status: false, error: "Username required" });
+        }
 
+        const normalized = normalizeUsername(username);
         const adminCreds = configLoader.getAdminCredentials();
-        if (username === adminCreds.username) {
+        if (normalized === normalizeUsername(adminCreds.username)) {
             return res.status(403).json({ status: false, error: "Cannot delete admin user" });
         }
 
-        const users = getUsers();
-        const userIndex = users.findIndex(u => u.username === username);
-        
-        if (userIndex === -1) {
+        const deletedUser = await User.findOneAndDelete({ usernameLower: normalized });
+        if (!deletedUser) {
             return res.status(404).json({ status: false, error: "User not found" });
         }
 
-        const deletedUser = users.splice(userIndex, 1)[0];
-        
-        await saveUsers(users);
-        
-        try {
-            await User.deleteOne({ email: deletedUser.email });
-        } catch (e) {
-            console.error("[Admin] MongoDB delete error:", e.message);
-        }
-        
-        logger.info(`[Admin] User ${username} deleted.`);
-        
-        res.json({ status: true, message: `User ${username} has been deleted.` });
+        logger.info(`[Admin] User ${deletedUser.username} deleted.`);
+        res.json({ status: true, message: `User ${deletedUser.username} has been deleted.` });
     } catch (e) {
         res.status(500).json({ status: false, error: "Failed to delete user" });
     }
@@ -262,31 +352,45 @@ router.post('/users/delete', adminAuth, async (req, res) => {
 router.post('/users/credits', adminAuth, async (req, res) => {
     try {
         const { username, credits, creditLimit } = req.body;
-        if (!username) return res.status(400).json({ status: false, error: "Username required" });
+        if (!username) {
+            return res.status(400).json({ status: false, error: "Username required" });
+        }
 
-        const users = getUsers();
-        const userIndex = users.findIndex(u => u.username === username);
-        
-        if (userIndex === -1) {
+        const update = {};
+        if (credits !== undefined) {
+            const parsedCredits = parseInt(credits, 10);
+            if (Number.isNaN(parsedCredits)) {
+                return res.status(400).json({ status: false, error: "Invalid credits value" });
+            }
+            update.credits = parsedCredits;
+        }
+
+        if (creditLimit !== undefined) {
+            const parsedLimit = parseInt(creditLimit, 10);
+            if (Number.isNaN(parsedLimit)) {
+                return res.status(400).json({ status: false, error: "Invalid credit limit value" });
+            }
+            update.creditLimit = parsedLimit;
+        }
+
+        const user = await User.findOneAndUpdate(
+            { usernameLower: normalizeUsername(username) },
+            { $set: update },
+            { new: true }
+        );
+
+        if (!user) {
             return res.status(404).json({ status: false, error: "User not found" });
         }
 
-        if (credits !== undefined) {
-            users[userIndex].credits = parseInt(credits);
-        }
-        if (creditLimit !== undefined) {
-            users[userIndex].creditLimit = parseInt(creditLimit);
-        }
-        
-        await saveUsers(users);
-        logger.info(`[Admin] User ${username} credits updated. Credits: ${users[userIndex].credits}, Limit: ${users[userIndex].creditLimit}`);
-        
-        res.json({ 
-            status: true, 
-            message: `User ${username} credits updated.`,
+        logger.info(`[Admin] User ${user.username} credits updated. Credits: ${user.credits}, Limit: ${user.creditLimit}`);
+
+        res.json({
+            status: true,
+            message: `User ${user.username} credits updated.`,
             data: {
-                credits: users[userIndex].credits,
-                creditLimit: users[userIndex].creditLimit
+                credits: user.credits,
+                creditLimit: user.creditLimit
             }
         });
     } catch (e) {

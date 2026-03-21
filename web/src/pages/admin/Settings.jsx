@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Save, Lock, Layout, Globe, Bell, Link as LinkIcon, Plus, Trash2, Image as ImageIcon, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
+import { getSessionHeaders } from '../../utils/authHeaders';
 
 const TabButton = ({ active, icon: Icon, label, onClick }) => (
     <button
@@ -29,8 +30,8 @@ const SecurityTab = () => {
     const [processing, setProcessing] = useState(false);
 
     const fetchBans = () => {
-        if (!user || !user.apikey) return;
-        axios.get('/api/admin/banned-ips', { headers: { 'Authorization': user.apikey } })
+        if (!user?.token) return;
+        axios.get('/api/admin/banned-ips', { headers: getSessionHeaders(user) })
             .then(res => setBannedIps(res.data.data))
             .catch(console.error);
     };
@@ -40,10 +41,10 @@ const SecurityTab = () => {
     }, [user]);
 
     const handleBan = async () => {
-        if (!newBan || !user || !user.apikey) return;
+        if (!newBan || !user?.token) return;
         setProcessing(true);
         try {
-            await axios.post('/api/admin/ban-ip', { ip: newBan }, { headers: { 'Authorization': user.apikey } });
+            await axios.post('/api/admin/ban-ip', { ip: newBan }, { headers: getSessionHeaders(user) });
             setNewBan("");
             fetchBans();
         } catch (e) {
@@ -54,9 +55,9 @@ const SecurityTab = () => {
     };
 
     const handleUnban = async (ip) => {
-        if (!user || !user.apikey) return;
+        if (!user?.token) return;
         try {
-            await axios.post('/api/admin/unban-ip', { ip: ip }, { headers: { 'Authorization': user.apikey } });
+            await axios.post('/api/admin/unban-ip', { ip: ip }, { headers: getSessionHeaders(user) });
             fetchBans();
         } catch (e) {
             console.error(e);
@@ -119,9 +120,9 @@ export default function Settings() {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        if (!user || !user.apikey) return;
+        if (!user?.token) return;
 
-        axios.get('/api/admin/settings', { headers: { 'Authorization': user.apikey } })
+        axios.get('/api/admin/settings', { headers: getSessionHeaders(user) })
             .then(res => setData(res.data.data))
             .catch((err) => {
                 console.error(err);
@@ -130,10 +131,10 @@ export default function Settings() {
     }, [user]);
 
     const handleSave = () => {
-        if (locked || !user || !user.apikey) return;
+        if (locked || !user?.token) return;
         setSaving(true);
 
-        axios.post('/api/admin/settings', data, { headers: { 'Authorization': user.apikey } })
+        axios.post('/api/admin/settings', data, { headers: getSessionHeaders(user) })
             .then(() => {
                 setStatus('Settings saved successfully.');
                 setTimeout(() => setStatus(''), 3000);
